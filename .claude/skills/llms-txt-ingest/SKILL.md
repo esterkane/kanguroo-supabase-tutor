@@ -24,9 +24,17 @@ the index is marked `status='retired'`, not deleted (old citations must still re
 Ingest: `llms-full.txt`, `llms/cli.txt`, `llms/js.txt`, `llms/server.txt`, `llms/api.txt`,
 `llms/python.txt`, all `docs/guides/*.md`, `pricing.md`, product overviews, and the KB
 sitemap's linked pages (depth 1, same host). Skip dart/swift/kotlin/csharp unless
-`--profile all`. `llms-full.txt` overlaps with the guides: dedupe by
-`sha256(normalised chunk text)`; keep the guide URL as canonical (`docs/guides/...`) because
-it is the better citation anchor, and record the duplicate in `meta.also_in`.
+`--profile all`.
+
+Depth-1 expansion (default; `--no-expand` to skip): every `https://supabase.com/docs/guides/...`
+link in the seed docs (incl. `llms-full.txt`) is fetched as its `.md` twin, and every KB link in
+the KB sitemap (`/kb/sitemap.md` 308-redirects to `/kb/markdown/sitemap.md`). As of 2026-10-21
+that is ~974 extra pages; the guide index pages themselves are only tables of contents.
+
+`llms-full.txt` has no per-page URLs, so pages fetched under their own URL are canonical:
+split it on `---` lines followed by a `# Title` line (fence tracking fails on the 7 MB file),
+drop pages whose H1 matches a fetched page, and ingest only the rest (~143 pages).
+Index entries must all succeed (exit 1); dead links inside the docs are reported, not fatal.
 
 ## Fetching
 - `httpx` with a 30 s timeout, `User-Agent: kaenguru-tutor-ingest/0.1 (+local dev)`,

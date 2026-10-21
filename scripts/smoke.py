@@ -32,8 +32,12 @@ def main() -> None:
         check("tutor.topic seeded", bool(topics and topics[0] > 0), f"{topics[0] if topics else 0} topics")
         labs = conn.execute("select count(*) from tutor.lab").fetchone()
         check("tutor.lab registered", bool(labs and labs[0] > 0), f"{labs[0] if labs else 0} labs")
-        conn.execute(f"select count(*) from tutor.hybrid_search('rls', {ZERO}, 1)").fetchone()
-        check("tutor.hybrid_search callable", True)
+        hits = conn.execute(f"select count(*) from tutor.hybrid_search('row level security', {ZERO}, 3)").fetchone()
+        n_hits = hits[0] if hits else 0
+        if chunks and chunks[0] > 0:
+            check("tutor.hybrid_search returns rows", n_hits > 0, f"{n_hits} hits for 'row level security'")
+        else:
+            check("tutor.hybrid_search callable (empty corpus: make ingest)", True)
 
     with psycopg.connect(lab_url()) as conn:
         roles = {r[0] for r in conn.execute(

@@ -16,7 +16,7 @@ is green and the task's test exists. Skill to load is in brackets.
 
 ## Phase 1 — Grounded text tutor
 
-- [ ] T1.1 `scripts/ingest_llms.py` end-to-end against local stack (dry-run → real); record `embedding_model` [llms-txt-ingest]
+- [x] T1.1 `scripts/ingest_llms.py` end-to-end against local stack (dry-run → real); record `embedding_model` [llms-txt-ingest]
 - [ ] T1.2 `backend/tutor/retrieval.py` `Retriever` protocol + `PgHybridRetriever`; unit test with 3 fixture chunks [hybrid-search-pgvector]
 - [ ] T1.3 `backend/tutor/tools.py` — `search_docs`, `web_search` (gated), `run_lab_sql`, `ledger_read`, `ledger_update`, `lab_control` with JSON schemas from `prompts/tools.md` [socratic-tutor-loop]
 - [ ] T1.4 `backend/tutor/prompt.py` — assembles system prompt from `prompts/` (master + runtime + mode + ledger summary + session language) [socratic-tutor-loop]

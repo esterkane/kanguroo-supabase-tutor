@@ -34,6 +34,9 @@ reset: ## db reset + lab DB recreate
 ingest: env ## fill the corpus from llms.txt (ARGS="--dry-run" etc.)
 	$(WITH_ENV) $(PY) scripts/ingest_llms.py $(ARGS)
 
+search: env ## query the corpus: make search Q="permission denied 42501"
+	$(WITH_ENV) $(PY) scripts/search.py "$(Q)"
+
 refresh: ## re-fetch changed docs only
 	$(MAKE) ingest
 
@@ -65,4 +68,4 @@ check: ## lint + all tests (needs the stack running for pgTAP)
 evals: ## full eval suite (uses API tokens)
 	$(PY) scripts/eval.py --all
 
-.PHONY: help env seed up down reset ingest refresh dev smoke test-db test-labs lint check evals
+.PHONY: help env seed up down reset ingest search refresh dev smoke test-db test-labs lint check evals
