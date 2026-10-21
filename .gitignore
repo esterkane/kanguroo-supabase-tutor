@@ -1,0 +1,11 @@
+.env
+.env.local
+data/
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+supabase/.temp/
+supabase/.branches/
+evals/results/
+frontend/dist/

@@ -1,0 +1,14 @@
+slug: 01-rls-vs-grant
+phase: D
+title: '"RLS is broken" — missing GRANT behind a correct policy'
+difficulty: easy
+est_minutes: 20
+topics: [rls-vs-grants, sqlstate-42501, postgrest-role-switching, policy-select]
+persistent_steps: [grant]          # the fix may be committed by the runner
+hypotheses:
+  - h: "The policy predicate is wrong (auth.uid() NULL)"
+    discriminating_test: "Query pg_policies; run as postgres with claims set — policy returns rows"
+  - h: "The role lacks the SELECT privilege on the table"
+    discriminating_test: "\\dp lab01.orders — authenticated absent from ACL; grant → symptom gone"
+  - h: "Schema USAGE missing"
+    discriminating_test: "\\dn+ lab01 — authenticated has USAGE already"

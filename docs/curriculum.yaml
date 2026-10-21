@@ -1,0 +1,28 @@
+# Seeds tutor.topic. Phases A..M from the master instructions. Slugs are what the ledger uses.
+phases:
+  A: { title: SQL and relational foundations,
+       topics: [sql-select-joins, aggregation-grouping, constraints-keys, normalisation, transactions-basics] }
+  B: { title: PostgreSQL architecture, transactions, MVCC, roles and privileges,
+       topics: [process-model-shared-buffers, mvcc-snapshots, isolation-levels, roles-and-privileges, search-path-security-definer] }
+  C: { title: Supabase architecture and request lifecycle,
+       topics: [request-lifecycle, api-gateway-and-keys, postgrest-role-switching, service-boundaries] }
+  D: { title: Auth, JWTs, grants and RLS,
+       topics: [jwt-claims-and-sessions, rls-vs-grants, sqlstate-42501, policy-select, policy-insert-update-with-check, auth-uid-null-semantics, ssr-cookies] }
+  E: { title: Data APIs and SDKs,
+       topics: [postgrest-filters, rpc-functions, supabase-js-clients, graphql-pg-graphql] }
+  F: { title: Storage, Realtime and Edge Functions,
+       topics: [storage-objects-rls, signed-urls-cdn, realtime-broadcast-vs-postgres-changes, realtime-authorization, edge-function-lifecycle, edge-cors-secrets] }
+  G: { title: CLI, migrations, seeds, testing and deployment,
+       topics: [cli-local-stack, migrations-workflow, migration-drift-repair, seeds, pgtap-testing, branching-deploy] }
+  H: { title: Query performance, indexes and planner,
+       topics: [explain-analyze-reading, estimates-vs-actuals, index-types-selectivity, rls-policy-performance, pg-stat-statements] }
+  I: { title: Locks, transactions, vacuum, bloat, WAL and replication,
+       topics: [lock-levels-ddl, blocking-and-deadlocks, long-transactions, autovacuum-and-bloat, wal-and-replication-slots] }
+  J: { title: Connections, Supavisor, networking and resource pressure,
+       topics: [direct-vs-pooler, session-vs-transaction-mode, connection-exhaustion, prepared-statements-pooling, ipv4-ipv6-tls] }
+  K: { title: Backups, restore, PITR, observability and operations,
+       topics: [backups-vs-pitr, restore-readiness, logs-and-reports, inspect-db-commands] }
+  L: { title: Self-hosting,
+       topics: [self-host-compose, service-versions, self-host-ops] }
+  M: { title: Real incidents and advanced support cases,
+       topics: [incident-model, hypothesis-trees, escalation-evidence, customer-explanation] }

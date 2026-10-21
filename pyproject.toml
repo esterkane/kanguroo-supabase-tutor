@@ -1,0 +1,23 @@
+[project]
+name = "kaenguru-tutor"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115", "uvicorn[standard]>=0.30", "anthropic>=0.40", "httpx>=0.27",
+  "psycopg[binary,pool]>=3.2", "pydantic>=2.8", "supabase>=2.9", "pyjwt[crypto]>=2.9",
+  "pyyaml>=6", "sse-starlette>=2.1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6", "mypy>=1.11", "pglast>=7", "types-pyyaml"]
+
+[tool.ruff]
+line-length = 110
+extend-exclude = ["frontend", "supabase"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests", "scripts/tests"]

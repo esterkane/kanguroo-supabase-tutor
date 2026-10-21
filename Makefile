@@ -1,0 +1,68 @@
+SHELL := /bin/bash
+.DEFAULT_GOAL := help
+SUPABASE := npx -y supabase@2.121.0
+PY := uv run python
+# 8000/5173 are taken by the AuDHS Tutor on this machine; the vite proxy reads TUTOR_API_PORT.
+API_PORT ?= 8020
+WEB_PORT ?= 5180
+# Load local stack URLs/keys (written by `make env`) for every recipe that needs them.
+WITH_ENV := set -a && . ./.env.local && set +a && export SUPABASE_DB_URL="$$DB_URL" &&
+
+help: ## list targets
+	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n",$$1,$$2}'
+
+env: ## export local Supabase URLs/keys into .env.local (never commit)
+	@$(SUPABASE) status -o env > .env.local 2>/dev/null || { echo "stack not running: make up"; exit 1; }
+
+seed: ## regenerate supabase/seed.sql from curriculum + labs
+	$(PY) scripts/seed.py
+
+up: ## start local stack, apply migrations (RESET=1 for db reset), create lab DB, install default labs
+	uv sync -q
+	$(SUPABASE) start
+	@if [ "$(RESET)" = "1" ]; then $(PY) scripts/seed.py && $(SUPABASE) db reset; fi
+	$(MAKE) env
+	$(WITH_ENV) $(PY) scripts/lab_db.py
+	$(WITH_ENV) $(PY) scripts/lab.py install 01-rls-vs-grant
+
+down: ## stop the stack (PURGE=1 to drop volumes)
+	$(SUPABASE) stop $(if $(PURGE),--no-backup,)
+
+reset: ## db reset + lab DB recreate
+	$(MAKE) up RESET=1
+
+ingest: env ## fill the corpus from llms.txt (ARGS="--dry-run" etc.)
+	$(WITH_ENV) $(PY) scripts/ingest_llms.py $(ARGS)
+
+refresh: ## re-fetch changed docs only
+	$(MAKE) ingest
+
+dev: ## backend :$(API_PORT) + frontend :$(WEB_PORT)
+	(uv run uvicorn backend.main:app --reload --port $(API_PORT) &) && cd frontend && \
+	  TUTOR_API_PORT=$(API_PORT) npm run dev -- --port $(WEB_PORT) --strictPort
+
+smoke: env ## stack reachable, schema + seed present, search callable, lab roles + lab 01 ok
+	$(WITH_ENV) $(PY) scripts/smoke.py
+
+test-db: ## pgTAP (schema) + lab checks in both directions
+	$(SUPABASE) test db
+	$(MAKE) test-labs
+
+test-labs: env ## every lab's checks.sql must FAIL on fresh setup and PASS after solution.sql
+	@$(WITH_ENV) for d in labs/*/; do s=$$(basename $$d); \
+	  $(PY) scripts/lab.py install $$s >/dev/null; \
+	  if $(PY) scripts/lab.py check $$s >/dev/null; then echo "FAIL $$s: checks pass while broken"; exit 1; fi; \
+	  $(PY) scripts/lab.py solve $$s >/dev/null; \
+	  $(PY) scripts/lab.py check $$s >/dev/null || { echo "FAIL $$s: checks fail after solution"; exit 1; }; \
+	  $(PY) scripts/lab.py install $$s >/dev/null; echo "ok   $$s"; done
+
+lint: ## ruff + mypy
+	uv run ruff check . && uv run mypy backend scripts
+
+check: ## lint + all tests (needs the stack running for pgTAP)
+	$(MAKE) lint && uv run pytest -q && $(MAKE) test-db && cd frontend && npm run -s typecheck && npm run -s test -- --run
+
+evals: ## full eval suite (uses API tokens)
+	$(PY) scripts/eval.py --all
+
+.PHONY: help env seed up down reset ingest refresh dev smoke test-db test-labs lint check evals
