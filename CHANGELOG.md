@@ -13,3 +13,7 @@
   kept; KB copies of docs troubleshooting articles skipped (broken /kb/ links); missing sources retired;
   raw copies in data/corpus; migration 20261021010000 makes hybrid_search return one row per chunk text
   (docs/guides wins ties) + pgTAP 002; `make search Q=...`; smoke asserts real hits once ingested.
+- 2026-10-21 T1.2 retrieval: `backend/tutor/schemas.py` (Chunk), `backend/tutor/retrieval.py` (Retriever /
+  Embedder / Reranker protocols, Ollama + OpenAI embedders, PgHybridRetriever, search_docs product
+  aliases); fix: hybrid_search pins hnsw.iterative_scan + ef_search (filtered searches returned 0 semantic
+  hits) — migration 20261021020000 + pgTAP 003; 7 retrieval tests (offline + 3 fixture chunks in local DB).

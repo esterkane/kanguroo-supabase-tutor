@@ -34,7 +34,13 @@ Declared `language sql stable security invoker set search_path = ''`.
 - `create index on tutor.docs_chunk using hnsw (embedding vector_cosine_ops) with (m=16, ef_construction=64);`
 - `create index on tutor.docs_chunk using gin (fts);`
 - `fts` is a generated column: `to_tsvector('english', heading_path || ' ' || content)`.
-- After bulk ingest: `analyze`. For recall tuning per session: `set local hnsw.ef_search = 100;`
+- After bulk ingest: `analyze`. `hnsw.ef_search = 100` and `hnsw.iterative_scan = relaxed_order`
+  are pinned on the function (`alter function ... set`), not per session. A function-level
+  `set hnsw.*` needs pgvector's library loaded first (`select '[1]'::extensions.vector;`), or
+  the postgres role gets 42501 on the placeholder parameter.
+- Filtered HNSW pitfall (taught in Phase H): the index returns ef_search rows and the WHERE filter
+  runs afterwards, so a selective filter empties the semantic side. Regression test:
+  `supabase/tests/003_hybrid_search_filtered.sql`.
 
 ## Python side (`backend/tutor/retrieval.py`)
 ```python

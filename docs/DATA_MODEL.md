@@ -99,7 +99,17 @@ returns chunks ranked by Reciprocal Rank Fusion of
 - `ts_rank_cd(fts, websearch_to_tsquery('english', query))` (GIN index).
 
 Returned columns: `chunk_id, url, anchor, heading_path, content, tier, fetched_at, score`.
-The tool layer builds the citation URL as `url || '#' || anchor` when an anchor exists.
+The tool layer builds the citation URL as `url || '#' || anchor` when an anchor exists
+(`Chunk.cite_url`).
+
+- One row per distinct chunk text (`content_hash`); a duplicated text keeps its best score and
+  prefers the `docs/guides` URL (migration `20261021010000`).
+- The function pins `hnsw.ef_search = 100` and `hnsw.iterative_scan = relaxed_order`
+  (migration `20261021020000`). Without the iterative scan, a `source_filter` is applied after the
+  HNSW scan has already picked its nearest rows from the whole corpus, so the semantic side can
+  return nothing.
+- `source_filter` matches stored `meta->>'product'` values; `backend/tutor/retrieval.py`
+  (`PRODUCT_ALIASES`) maps the `search_docs` product enum onto them (e.g. `kb` → `kb`, `troubleshooting`).
 
 ## RLS
 
