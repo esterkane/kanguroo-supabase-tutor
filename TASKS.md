@@ -23,7 +23,7 @@ is green and the task's test exists. Skill to load is in brackets.
   - Persona voice + few-shots: `prompts/persona/kaenguru_persona.yaml` (from the AuDHS Tutor). Its
     `system_prompt` names AI/ML/LLMs/web dev as the subject; override that line with Supabase/PostgreSQL,
     fill `{learner_name}`, and keep the "neutral on request" few-shot.
-- [ ] T1.5 `backend/tutor/orchestrator.py` — Claude tool loop with streaming; emits `TutorTurn`; max 6 tool calls/turn [socratic-tutor-loop]
+- [x] T1.5 `backend/tutor/orchestrator.py` — Claude tool loop with streaming; emits `TutorTurn`; max 6 tool calls/turn [socratic-tutor-loop]
 - [ ] T1.6 `backend/tutor/guard.py` — citation coverage, secret scan, destructive-SQL warning, exactly-one-question, incident headings [socratic-tutor-loop]
 - [ ] T1.7 `backend/tutor/lab_runner.py` — SAVEPOINT sandbox, role switch, claims, EXPLAIN capture, deny-list, 5 s statement_timeout [broken-labs]
   - Implement `backend.tutor.tools.LabTools` (`run_sql` + `control`: install/reset/status/hint/check/list)
@@ -32,6 +32,8 @@ is green and the task's test exists. Skill to load is in brackets.
 - [ ] T1.9 `frontend/src/tutor` — chat panel, lesson sidebar (objective, main path / rabbit hole / return point), ledger view, Mermaid renderer, mode switches (hint/show me/skip/neutral/rabbit hole/recap/exam/slower/faster) [tutor-viz]
 - [ ] T1.10 First-turn flow: persona intro + ONE opening question; then request-flow lesson; then lab 01 handed over [socratic-tutor-loop]
 - [ ] T1.11 Evals: `evals/grounding.jsonl` (30), `evals/socratic.jsonl` (15), `evals/safety.jsonl` (10) + `scripts/eval.py` [tutor-evals]
+  - Include incident→lesson cases from `docs/examples/slow-query-tutoring-path.md` (one question per turn,
+    credit-then-correct, "what this does not prove", meaning-preserving fix).
 - [ ] T1.12 `pg_cron` job `refresh_docs` weekly calling the ingest via `pg_net` to FastAPI `/internal/refresh` (local only) [llms-txt-ingest]
 
 ## Phase 2 — Voice, incident mode, labs
@@ -39,6 +41,8 @@ is green and the task's test exists. Skill to load is in brackets.
 - [ ] T2.1 Web Speech STT/TTS; push-to-talk and hands-free; `speech` track playback [tutor-voice]
 - [ ] T2.2 Incident mode: structured incident model form that the model fills progressively [socratic-tutor-loop]
 - [ ] T2.3 Labs 02–08: missing grant, wrong JWT identity, slow RLS policy + missing index, lock contention, long transaction vs autovacuum, connection exhaustion (pool sim), migration drift [broken-labs]
+  - Lab 04 (missing-index) should reproduce `docs/examples/slow-query-tutoring-path.md`: orders table,
+    `customer_id` filter + `created_at desc limit 20`, then the index-used-but-slow follow-up (dead tuples).
 - [ ] T2.4 Web search adapter with tiering + date + redaction; evals for "label community evidence" [socratic-tutor-loop]
 - [ ] T2.5 Spaced review scheduler (`next_review`), session-end summary block (5 headings) [socratic-tutor-loop]
 - [ ] T2.6 Optional server TTS (Piper/Kokoro) cached in Storage [tutor-voice]

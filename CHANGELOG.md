@@ -24,3 +24,10 @@
   persona voice retargeted to Supabase/PostgreSQL + runtime + TutorTurn schema + 63 topic slugs), cached mode
   block, uncached session state (date, language, objective, ledger weakest/recent, lab, still-wrong);
   persona few-shots dropped (off-topic). 13 tests.
+- 2026-10-21 T1.5 orchestrator: `backend/tutor/orchestrator.py` streams a Claude tool loop (claude-sonnet-5-5,
+  adaptive thinking, effort medium, server-side refusal fallback, eager tool-input streaming) and ends in a
+  parsed `TutorTurn` (`schemas.py`, `turn_parser.py`: one repair, then `unstructured`). History is append-only:
+  `system` is now fixed per session and mode + session state go in as a mid-conversation system message
+  (prompt.py split); `drop_block` as safety net. Contract change: the model omits `text` from the JSON (app
+  fills it). Reference tutoring path from Saru's slow-query session added (`prompts/examples/`,
+  `docs/examples/`). `make turn Q=...` for a live turn. 16 new tests (fake client, real SDK types).

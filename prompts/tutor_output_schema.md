@@ -8,7 +8,6 @@ Pydantic model lives in `backend/tutor/schemas.py`; this is the human-readable c
   "language": "de | en",
   "persona_on": true,
   "speech": "Kleinkünstler, GRANT ist der Haustürschlüssel, die Policy das Kühlschrankfach. Welche Kontrolle prüfst du zuerst bei SQLSTATE 42501?",
-  "text": "<the full Markdown shown to the learner, identical to the streamed part>",
   "diagrams": [
     { "id": "d1", "kind": "sequenceDiagram | flowchart | erDiagram | xychart-beta", "title": "Request flow", "code": "sequenceDiagram\n  participant C as client\n  ..." }
   ],
@@ -34,7 +33,7 @@ Pydantic model lives in `backend/tutor/schemas.py`; this is the human-readable c
 ```
 
 Field rules
-- `text` required; `speech` required; `next_question` required unless `mode == incident`
+- `text` is not part of the JSON: the app sets it to the streamed Markdown. `speech` required; `next_question` required unless `mode == incident`
   and the learner asked for the fix, or `session_end` is present.
 - `citations[].n` must be the set of `[n]` markers used in `text`.
 - `incident` only in incident mode; fill progressively, keep `null` for unknowns.

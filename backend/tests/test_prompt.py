@@ -19,31 +19,38 @@ def entry(topic: str, score: int, days_ago: int, evidence: str = "observed in la
                        last_reviewed=datetime(2026, 10, 21, tzinfo=UTC) - timedelta(days=days_ago), next_review=None)
 
 
-def test_blocks_order_and_cache_boundaries() -> None:
-    blocks = p.system_blocks(p.SessionState(mode="incident"))
-    assert [b.get("cache_control") for b in blocks] == [{"type": "ephemeral"}, {"type": "ephemeral"}, None]
+def test_system_is_one_cached_static_block() -> None:
+    blocks = p.system_blocks(persona_on=True)
+    assert len(blocks) == 1 and blocks[0]["cache_control"] == {"type": "ephemeral"}
     static = blocks[0]["text"]
     order = ["# SUPABASE & POSTGRESQL — KÄNGURU", "# PERSONA VOICE DETAIL", "# RUNTIME CONTRACT",
-             "# TutorTurn schema", "# CURRICULUM TOPIC SLUGS"]
+             "# TutorTurn schema", "# REFERENCE TUTORING PATH", "# CURRICULUM TOPIC SLUGS"]
     positions = [static.index(marker) for marker in order]
     assert positions == sorted(positions)
     assert all(static[pos - len(p.SEP):pos] == p.SEP for pos in positions[1:])  # each part starts after SEP
-    assert blocks[1]["text"].startswith("# MODE: incident")
-    assert blocks[2]["text"].startswith("# SESSION STATE")
+    assert "# SESSION STATE" not in static and "# MODE:" not in static
 
 
-def test_static_prefix_does_not_depend_on_per_turn_state() -> None:
-    a = p.system_blocks(p.SessionState(objective="RLS", ledger=[entry("rls-vs-grants", 1, 0)], first_turn=True))
-    b = p.system_blocks(p.SessionState(objective="locks", today=date(2027, 1, 1)))
-    assert a[0] == b[0] and a[1] == b[1]
-    assert a[2] != b[2]
+def test_turn_system_text_is_mode_then_state() -> None:
+    text = p.turn_system_text(p.SessionState(mode="incident", objective="locks"))
+    assert text.startswith("# MODE: incident")
+    assert text.index(p.SEP) < text.index("# SESSION STATE")
+    assert "- Objective: locks" in text
+
+
+def test_system_does_not_depend_on_per_turn_state() -> None:
+    # Append-only history: system must be byte-identical across turns of a session.
+    assert p.system_blocks(True, "Saru") == p.system_blocks(True, "Saru")
+    a = p.turn_system_text(p.SessionState(objective="RLS", ledger=[entry("rls-vs-grants", 1, 0)], first_turn=True))
+    b = p.turn_system_text(p.SessionState(objective="locks", today=date(2027, 1, 1)))
+    assert a != b
 
 
 def test_persona_off_drops_persona_block_only() -> None:
-    off = p.system_blocks(p.SessionState(mode="neutral", persona_on=False))
+    off = p.system_blocks(persona_on=False)
     assert "# PERSONA VOICE DETAIL" not in off[0]["text"]
     assert "# RUNTIME CONTRACT" in off[0]["text"]
-    assert "Persona: off" in off[2]["text"]
+    assert "Persona: off" in p.turn_system_text(p.SessionState(mode="neutral", persona_on=False))
 
 
 def test_persona_is_retargeted_and_named() -> None:

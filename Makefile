@@ -37,6 +37,10 @@ ingest: env ## fill the corpus from llms.txt (ARGS="--dry-run" etc.)
 search: env ## query the corpus: make search Q="permission denied 42501"
 	$(WITH_ENV) $(PY) scripts/search.py "$(Q)"
 
+turn: env ## one real tutor turn (uses API tokens): make turn Q="Hallo" [ARGS="--mode incident"]
+	@test -f .env || { echo "create .env with ANTHROPIC_API_KEY (cp .env.example .env)"; exit 1; }
+	$(WITH_ENV) set -a && . ./.env && set +a && $(PY) scripts/tutor_turn.py $(ARGS) "$(Q)"
+
 refresh: ## re-fetch changed docs only
 	$(MAKE) ingest
 
@@ -68,4 +72,4 @@ check: ## lint + all tests (needs the stack running for pgTAP)
 evals: ## full eval suite (uses API tokens)
 	$(PY) scripts/eval.py --all
 
-.PHONY: help env seed up down reset ingest search refresh dev smoke test-db test-labs lint check evals
+.PHONY: help env seed up down reset ingest search turn refresh dev smoke test-db test-labs lint check evals

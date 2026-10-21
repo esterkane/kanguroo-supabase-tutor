@@ -1,12 +1,13 @@
-"""Assemble the tutor's system prompt from prompts/ as Anthropic `system` blocks.
+"""Assemble the tutor's prompt from prompts/.
 
-Order (socratic-tutor-loop skill), joined with `\\n\\n---\\n\\n` inside the static block:
-  1. master instructions (Saru's source of truth, never edited here)
-     + persona voice detail from prompts/persona/kaenguru_persona.yaml (only when persona is on)
-  2. runtime contract + TutorTurn schema + valid curriculum topic slugs
-  3. the mode file (own block: the learner can switch modes mid-session)
-  4. per-turn session state (not cached)
-Blocks 1–2 and 3 carry `cache_control`, so a session pays for the large prefix once.
+Two parts, because the conversation must stay append-only: current models only replay earlier
+thinking blocks while `system`, `tools` and every earlier message are byte-identical.
+  * `system_blocks()` — fixed for the whole session, cached. Joined with `\\n\\n---\\n\\n`:
+    master instructions (Saru's source of truth, never edited here); persona voice detail from
+    prompts/persona/kaenguru_persona.yaml (only when persona is on); runtime contract; TutorTurn
+    schema; reference tutoring paths (prompts/examples/*.md, sorted); valid curriculum topic slugs.
+  * `turn_system_text()` — mode file + session state, sent each turn as a mid-conversation
+    `{"role": "system"}` message right after the learner's message, never edited afterwards.
 """
 from __future__ import annotations
 
@@ -94,7 +95,9 @@ def static_prefix(persona_on: bool, learner_name: str) -> str:
     parts = [_read("kaenguru_master_instructions.md")]
     if persona_on:
         parts.append(persona_voice(learner_name))
-    parts += [_read("tutor_runtime.md"), _read("tutor_output_schema.md"), topic_slugs()]
+    parts += [_read("tutor_runtime.md"), _read("tutor_output_schema.md")]
+    parts += [path.read_text(encoding="utf-8").strip() for path in sorted((PROMPTS / "examples").glob("*.md"))]
+    parts.append(topic_slugs())
     return SEP.join(parts)
 
 
@@ -148,11 +151,11 @@ def session_block(state: SessionState) -> str:
     return "\n".join(lines)
 
 
-def system_blocks(state: SessionState) -> list[dict[str, Any]]:
-    """The `system` parameter for messages.create: two cached static blocks, then the session state."""
-    cached = {"type": "ephemeral"}
-    return [
-        {"type": "text", "text": static_prefix(state.persona_on, state.learner_name), "cache_control": cached},
-        {"type": "text", "text": mode_text(state.mode), "cache_control": cached},
-        {"type": "text", "text": session_block(state)},
-    ]
+def system_blocks(persona_on: bool, learner_name: str = DEFAULT_LEARNER_NAME) -> list[dict[str, Any]]:
+    """The `system` parameter: one cached block, fixed for the session (persona choice at session start)."""
+    return [{"type": "text", "text": static_prefix(persona_on, learner_name), "cache_control": {"type": "ephemeral"}}]
+
+
+def turn_system_text(state: SessionState) -> str:
+    """Mode + session state for one turn, sent as a mid-conversation system message."""
+    return mode_text(state.mode) + SEP + session_block(state)
