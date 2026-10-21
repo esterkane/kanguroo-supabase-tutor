@@ -101,3 +101,14 @@ def test_session_block_ledger_summary_and_flags() -> None:
 
 def test_empty_ledger_asks_for_scenario_assessment() -> None:
     assert "assess with a scenario" in p.session_block(p.SessionState())
+
+
+@pytest.mark.parametrize(("step", "fragment"), [
+    ("opening", "follow the FIRST TURN section exactly"),
+    ("request_flow", "sequenceDiagram"),
+    ("lab_handover", 'call lab_control with slug "01-rls-vs-grant" and action "install"'),
+])
+def test_onboarding_step_guidance(step: p.OnboardingStep, fragment: str) -> None:
+    text = p.session_block(p.SessionState(onboarding=step, first_turn=True))
+    assert "Onboarding step" in text and fragment in text
+    assert text.count("FIRST TURN") <= 1  # the onboarding line replaces the generic first-turn line

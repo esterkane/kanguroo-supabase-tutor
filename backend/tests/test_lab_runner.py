@@ -46,7 +46,8 @@ def sql(text: str, **kw: Any) -> RunLabSqlInput:
     "drop database postgres", "create role hacker login", "grant authenticated to anon",
     "alter system set work_mem = '1GB'", "select pg_terminate_backend(123)", "select pg_read_file('/etc/passwd')",
     "copy lab01.orders to '/tmp/x'", "create extension pg_net", "commit", "select 1; rollback",
-    "set role postgres", "reset role", "set session authorization postgres",
+    "set role postgres", "reset role", "set session authorization postgres", "set local role supabase_admin",
+    "set local role authenticator",
 ])
 def test_deny_list(bad: str) -> None:
     assert deny_reason(bad) is not None
@@ -56,6 +57,7 @@ def test_deny_list(bad: str) -> None:
     "select * from lab01.orders", "grant select on lab01.orders to authenticated",
     "create extension if not exists pgtap", "explain select 1",
     "select set_config('request.jwt.claims', '{}', true)", "create index on lab01.orders (created_at)",
+    "create table t (id int); set local role authenticated; select count(*) from t",
 ])
 def test_deny_list_allows_lab_work(ok: str) -> None:
     assert deny_reason(ok) is None
@@ -191,3 +193,22 @@ async def test_lab_run_records_tests_hints_and_outcome(runner: LabRunner, pool: 
     async with as_user(pool, uuid4()) as conn:  # another learner cannot see the run
         cur = await conn.execute("select count(*) from tutor.lab_run where session_id = %s", (session_id,))
         assert (await cur.fetchone() or [None])[0] == 0
+
+
+async def test_set_local_role_switches_within_one_statement(runner: LabRunner) -> None:
+    out = await runner.run_sql(sql(
+        "create table lab01.k_demo (id int); insert into lab01.k_demo values (1); "
+        "set local role authenticated; select count(*)::int as n from lab01.k_demo", role="postgres"), uuid4())
+    assert out["ok"] is False and out["sqlstate"] == "42501"  # authenticated has no GRANT on the new table
+    gone = await runner.run_sql(sql("select to_regclass('lab01.k_demo')::text as t", role="postgres"), uuid4())
+    assert gone["rows"] == [{"t": None}]  # rolled back: nothing persisted
+
+
+async def test_readme_evidence_block_runs_as_written(runner: LabRunner) -> None:
+    readme = (runner.labs["01-rls-vs-grant"].path / "README.md").read_text()
+    block = readme.split("```sql", 1)[1].split("```", 1)[0]
+    assert block.strip().startswith("begin;") and block.strip().endswith("rollback;")
+    out = await runner.run_sql(sql(block, role="postgres"), uuid4())
+    assert out["sqlstate"] == "42501"  # same evidence as in psql, without the transaction wrapper
+    for still_refused in ("begin; select 1; commit;", "select 1; rollback;", "begin; select 1; rollback; select 2;"):
+        assert (await runner.run_sql(sql(still_refused), uuid4())).get("refused") is True, still_refused

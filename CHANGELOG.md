@@ -69,3 +69,9 @@
   sandbox as the tutor) with EXPLAIN plan tree and "send to tutor"; de/en strings. Verified in the browser
   with a live turn and lab 04's real plan. Fixes: effect returned scrollIntoView's Promise (Chromium crash);
   guard QUESTION_NOT_IN_TEXT now tolerates reworded questions. `make env` writes frontend/.env.local.
+- 2026-10-21 T1.10 first-session flow: onboarding step per session (opening → request-flow lesson with a sequence
+  diagram → lab 01 handover) until lab 01 was handed over once; the model installs the lab via lab_control so it
+  introduces the case from the real customer report; router streams a `lab` event (also runs TutorTurn.lab_action,
+  never twice, coaching hints stripped); UI shows a notice, opens the Labs tab and pre-fills the console from the
+  README's evidence query. Runner: SET LOCAL ROLE to the tool's roles, exact begin…rollback wrapper unwrapped.
+  Guard question check tolerates self-contained next_question. Verified live in the browser (three walk-throughs).

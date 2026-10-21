@@ -173,3 +173,61 @@ async def test_lab_console_runs_in_the_sessions_sandbox(api: Any, users: tuple[U
     refused = (await client.post("/tutor/lab/sql", json={**body, "sql": "drop database lab"}, headers=auth(a))).json()
     assert refused["refused"] is True
     assert (await client.post("/tutor/lab/sql", json=body, headers=auth(b))).status_code == 404
+
+
+async def test_onboarding_opening_request_flow_lab_handover(api: Any, users: tuple[UUID, UUID]) -> None:
+    client, svc, fake = api
+    a, _ = users
+    sid = (await client.post("/tutor/session", json={}, headers=auth(a))).json()["id"]
+    flow = {"id": "d1", "kind": "sequenceDiagram", "title": "Request flow",
+            "code": "sequenceDiagram\n  participant C as client\n  C->>API: GET /rest/v1/notes"}
+    base = {"mode": "lesson", "language": "de", "persona_on": True, "speech": "Welche Kontrolle?",
+            "next_question": "Welche Kontrolle?"}
+    fake.script += [
+        text_reply("Hallo Kleinkünstler, ein kleiner Fall."),
+        text_reply("Erst GRANT, dann RLS.", turn={**base, "diagrams": [flow]}),
+        text_reply("Hier ist dein erster Fall.", turn={**base, "lab_action": {"slug": "01-rls-vs-grant",
+                                                                             "action": "install"}}),
+        text_reply("Was sagt die Abfrage?"),
+    ]
+
+    def step_line(request: int) -> str:
+        system = [m["content"] for m in fake.requests[request]["messages"] if m["role"] == "system"][-1]
+        return next((ln for ln in system.splitlines() if "Onboarding" in ln), "")
+
+    await client.post("/tutor/turn", json={"session_id": sid, "text": "Hallo"}, headers=auth(a))
+    assert "step 1 of 3 (opening)" in step_line(0)
+    await client.post("/tutor/turn", json={"session_id": sid, "text": "GRANT"}, headers=auth(a))
+    assert "step 2 of 3 (request-flow lesson)" in step_line(1)
+    third = await client.post("/tutor/turn", json={"session_id": sid, "text": "Klar"}, headers=auth(a))
+    assert "step 3 of 3 (lab handover)" in step_line(2)
+    lab = [data for name, data in parse_sse(third.text) if name == "lab"]
+    assert lab and lab[0]["slug"] == "01-rls-vs-grant" and lab[0]["result"]["ok"] is True
+    assert "Customer report" in lab[0]["result"]["scenario"]
+    assert svc.runners[UUID(sid)].active is not None
+
+    await client.post("/tutor/turn", json={"session_id": sid, "text": "Ok"}, headers=auth(a))
+    assert step_line(3) == ""  # lab 01 was handed over: onboarding is finished for this learner
+    assert await svc.store.onboarding_step(a, UUID(sid)) is None
+
+
+async def test_tool_installed_lab_reaches_the_ui_without_coaching(api: Any, users: tuple[UUID, UUID]) -> None:
+    from backend.tests.test_orchestrator import FakeStream, message
+    client, svc, fake = api
+    a, _ = users
+    sid = (await client.post("/tutor/session", json={}, headers=auth(a))).json()["id"]
+    install = FakeStream([], message([{"type": "tool_use", "id": "toolu_lab", "name": "lab_control",
+                                       "input": {"slug": "01-rls-vs-grant", "action": "install"}}], stop="tool_use"))
+    lab_action = {"mode": "lesson", "language": "de", "persona_on": True, "speech": "Los?", "next_question": "Los?",
+                  "lab_action": {"slug": "01-rls-vs-grant", "action": "install"}}
+    fake.script += [install, text_reply("Ein Kunde meldet 42501 auf orders.", turn=lab_action)]
+    res = await client.post("/tutor/turn", json={"session_id": sid, "text": "Klar"}, headers=auth(a))
+    events = parse_sse(res.text)
+    tool_result = fake.requests[1]["messages"][-1]["content"][0]["content"]
+    assert "permission denied for table orders" in tool_result  # the model saw the real report before writing
+    labs = [data for name, data in events if name == "lab"]
+    assert len(labs) == 1  # lab_action install for the same lab is not run a second time
+    assert labs[0]["slug"] == "01-rls-vs-grant" and "Customer report" in labs[0]["result"]["scenario"]
+    assert "coaching_for_tutor_only" not in labs[0]["result"]
+    runs = svc.runners[UUID(sid)].active
+    assert runs is not None and runs.spec.slug == "01-rls-vs-grant"

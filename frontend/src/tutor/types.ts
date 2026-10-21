@@ -121,4 +121,5 @@ export type StreamEvent =
   | { event: "tool_result_summary"; data: { name: string; is_error: boolean; summary: string } }
   | { event: "rewrite"; data: { codes: string[] } }
   | { event: "turn"; data: { turn_id: string; turn: TutorTurn; usage: Record<string, number>; model: string } }
+  | { event: "lab"; data: { slug: string; action: string; result: Record<string, unknown> } }
   | { event: "error"; data: { status: number; message: string } };

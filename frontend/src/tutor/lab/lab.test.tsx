@@ -26,3 +26,15 @@ test("plan tree highlights misestimates and shows buffers", () => {
   expect(screen.getByText(/buffers hit 120 read 30650/)).toBeTruthy();
   expect(screen.getByText(/removed 1988480/)).toBeTruthy();
 });
+
+test("evidence query becomes console settings without the psql wrapper", async () => {
+  const { consolePreset } = await import("./LabConsole");
+  const readme = "# Lab\n\n```sql\nbegin;\nset local role authenticated;\nselect set_config('request.jwt.claims',\n" +
+    "  '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}', true);\n" +
+    "select * from lab01.orders;\nrollback;\n```\n\nmore\n```sql\nselect 2;\n```";
+  expect(consolePreset(readme)).toEqual({ sql: "select * from lab01.orders;", role: "authenticated",
+                                          sub: "11111111-1111-1111-1111-111111111111" });
+  expect(consolePreset("# Lab\n```sql\nselect sum(revenue) from lab09.monthly_revenue;\n```")).toEqual(
+    { sql: "select sum(revenue) from lab09.monthly_revenue;", role: "postgres", sub: "" });
+  expect(consolePreset("no sql here")).toBeNull();
+});

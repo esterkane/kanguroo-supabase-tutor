@@ -22,7 +22,7 @@ from backend.tutor.db import as_user
 from backend.tutor.lab_runner import LabRunner, lab_pool
 from backend.tutor.ledger import LedgerStore, PgLedger
 from backend.tutor.orchestrator import Message, Orchestrator, reply_text
-from backend.tutor.prompt import ActiveLab, SessionState
+from backend.tutor.prompt import ONBOARDING_LAB, ActiveLab, OnboardingStep, SessionState
 from backend.tutor.retrieval import PgHybridRetriever, Retriever, embedder_from_env
 from backend.tutor.schemas import TutorTurn
 
@@ -79,6 +79,21 @@ class TurnStore:
                 "and (role = 'user' and content not like %s or role = 'assistant' and tutor_turn is not null) "
                 "order by seq", (session_id, APP_MESSAGE + "%"))
             return await cur.fetchall()
+
+    async def onboarding_step(self, user_id: UUID, session_id: UUID) -> OnboardingStep | None:
+        """Where the learner is on the first-session path; None once lab 01 was ever handed over to them."""
+        async with as_user(self.pool, user_id) as conn:
+            cur = await conn.execute(
+                "select exists (select 1 from tutor.lab_run where lab_slug = %s),"
+                "       count(*) filter (where tutor_turn is not null),"
+                "       bool_or(tutor_turn->'diagrams' @> '[{\"kind\": \"sequenceDiagram\"}]')"
+                " from tutor.turn where session_id = %s", (ONBOARDING_LAB, session_id))
+            handed_over, tutor_turns, has_flow_diagram = await cur.fetchone() or (False, 0, False)
+        if handed_over:
+            return None
+        if not tutor_turns:
+            return "opening"
+        return "lab_handover" if has_flow_diagram else "request_flow"
 
     async def append(self, user_id: UUID, session_id: UUID, messages: list[Message], turn: TutorTurn,
                      usage: dict[str, int], previous_mode: str) -> UUID:
@@ -166,9 +181,11 @@ class TutorService:
         ledger = await self.ledger.read(user_id)
         runner = self.runners.get(session["id"])
         lab = runner.active if runner else None
+        onboarding = await self.store.onboarding_step(user_id, session["id"])
         return SessionState(
             mode=session["mode"], language=session["language"], persona_on=session["persona_on"],
             objective=session["objective"], ledger=ledger,
             active_lab=ActiveLab(lab.spec.slug, lab.spec.title, lab.hints_used) if lab else None,
             first_turn=not history and not ledger,
+            onboarding=onboarding,
         )

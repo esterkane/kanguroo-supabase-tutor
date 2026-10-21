@@ -44,6 +44,13 @@ def test_question_rules() -> None:
                     text="GRANT und RLS [1].\n\nWelche der beiden Kontrollen, GRANT (Tabellenprivileg) oder "
                          "RLS-Policy, würdest du als Erstes prüfen, und warum? Ein Satz genügt.")
     assert "QUESTION_NOT_IN_TEXT" not in codes(reworded)
+    self_contained = turn(  # real case from the live onboarding: next_question repeats the scenario
+        next_question="Eine eingeloggte Nutzerin bekommt bei select auf orders HTTP 200 und eine leere Liste, obwohl "
+                      "Zeilen existieren: Verdächtigst du ein fehlendes GRANT oder eine RLS-Policy, und warum?",
+        text="Fall [1].\n\nWas vermutest du als Erstes: ein fehlendes GRANT oder eine RLS-Policy, die nichts durchlässt?")
+    assert "QUESTION_NOT_IN_TEXT" not in codes(self_contained)
+    unrelated = turn(text="Fall [1].\n\nHast du Docker installiert?")
+    assert codes(unrelated)["QUESTION_NOT_IN_TEXT"] == "warn"
 
 
 # ----------------------------------------------------------------------------- citations

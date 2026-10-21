@@ -6,6 +6,30 @@ import { PlanTree } from "./PlanTree";
 
 const ROLES = ["authenticated", "anon", "postgres"] as const;
 
+export interface ConsolePreset {
+  sql: string;
+  role: (typeof ROLES)[number];
+  sub: string;
+}
+
+/** The first ```sql block of a lab README (its evidence query) as console settings. READMEs are written for
+ *  psql (begin; set local role ...; set_config claims; ...; rollback;) — the console sets role and claims
+ *  itself and refuses transaction control, so those wrappers become fields. */
+export function consolePreset(scenario: string): ConsolePreset | null {
+  const block = /```sql\n([\s\S]*?)```/.exec(scenario)?.[1];
+  if (!block) return null;
+  const roleMatch = /set\s+local\s+role\s+(\w+)/i.exec(block)?.[1];
+  const role = (ROLES as readonly string[]).includes(roleMatch ?? "") ? (roleMatch as ConsolePreset["role"]) : "postgres";
+  const sub = /"sub"\s*:\s*"([^"]+)"/.exec(block)?.[1] ?? "";
+  const sql = block
+    .replace(/select\s+set_config\(\s*'request\.jwt\.claims'[\s\S]*?\)\s*;/gi, "")
+    .replace(/^\s*(begin|commit|rollback|end)\s*;\s*$/gim, "")
+    .replace(/^\s*set\s+local\s+role\s+\w+\s*;\s*$/gim, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { sql, role, sub };
+}
+
 /** Markdown summary of a console result, for the learner to send to the tutor as evidence. */
 export function resultSummary(sql: string, role: string, sub: string, r: LabSqlResult): string {
   const lines = [`Lab-Konsole (Rolle ${role}${sub ? `, sub ${sub}` : ""}):`, "```sql", sql.trim(), "```"];
@@ -25,12 +49,12 @@ export function resultSummary(sql: string, role: string, sub: string, r: LabSqlR
   return lines.join("\n");
 }
 
-export function LabConsole({ api, sessionId, s, onSend }: {
-  api: TutorApi; sessionId: string; s: Strings; onSend: (text: string) => void;
+export function LabConsole({ api, sessionId, s, onSend, preset }: {
+  api: TutorApi; sessionId: string; s: Strings; onSend: (text: string) => void; preset?: ConsolePreset | null;
 }) {
-  const [sql, setSql] = useState("select * from lab01.orders;");
-  const [role, setRole] = useState<(typeof ROLES)[number]>("authenticated");
-  const [sub, setSub] = useState("11111111-1111-1111-1111-111111111111");
+  const [sql, setSql] = useState(preset?.sql ?? "select * from lab01.orders;");
+  const [role, setRole] = useState<(typeof ROLES)[number]>(preset?.role ?? "authenticated");
+  const [sub, setSub] = useState(preset ? preset.sub : "11111111-1111-1111-1111-111111111111");
   const [explain, setExplain] = useState(false);
   const [persist, setPersist] = useState(false);
   const [result, setResult] = useState<LabSqlResult | null>(null);

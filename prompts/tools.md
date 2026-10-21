@@ -29,7 +29,7 @@
   },
   {
     "name": "run_lab_sql",
-    "description": "Execute SQL in the disposable local lab database only, as a Supabase role with optional JWT claims, inside a rolled-back savepoint. Returns rows (<=200), sqlstate, message, hint, and optionally an EXPLAIN (ANALYZE, BUFFERS) JSON plan. Refuses destructive server-level statements.",
+    "description": "Execute SQL in the disposable local lab database only, as a Supabase role with optional JWT claims, inside a rolled-back savepoint. No BEGIN/COMMIT/ROLLBACK; to switch roles inside the SQL use SET LOCAL ROLE anon|authenticated|service_role|postgres. Returns rows (<=200), sqlstate, message, hint, and optionally an EXPLAIN (ANALYZE, BUFFERS) JSON plan. Refuses destructive server-level statements.",
     "input_schema": {
       "type": "object",
       "properties": {

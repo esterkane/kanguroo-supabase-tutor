@@ -4,7 +4,8 @@ and put a `TutorService` on `app.state.tutor`.
 POST /session              start a session
 GET  /session/{id}         session + transcript (what the learner saw)
 POST /turn                 one tutor turn as Server-Sent Events:
-                           token, tool_call, tool_result_summary, rewrite, turn, error
+                           token, tool_call, tool_result_summary, rewrite, turn, lab, error
+                           (`lab`: the app ran the turn's lab_action, e.g. installed lab 01)
 GET  /ledger               mastery ledger, weakest first
 GET  /labs                 available labs
 POST /lab/{slug}/{action}  install | reset | status | hint | check for the session's lab
@@ -132,8 +133,9 @@ async def turn(body: TurnRequest, svc: Svc, user: User) -> EventSourceResponse:
         async with lock:
             history = await svc.store.history(user, body.session_id)
             state = await svc.session_state(user, session, history)
-            ctx = ToolContext(user_id=user, retriever=svc.retriever, ledger=svc.ledger,
-                              lab=svc.runner(body.session_id))
+            runner = svc.runner(body.session_id)
+            ctx = ToolContext(user_id=user, retriever=svc.retriever, ledger=svc.ledger, lab=runner)
+            before = runner.active.lab_run_id if runner.active else None  # detects lab_control installs
             try:
                 async for event in svc.orchestrator().run_turn(history=history, user_text=body.text, state=state,
                                                                ctx=ctx):
@@ -152,6 +154,17 @@ async def turn(body: TurnRequest, svc: Svc, user: User) -> EventSourceResponse:
                         yield _sse("turn", {"turn_id": turn_id, "turn": event.turn.model_dump(mode="json"),
                                             "usage": event.usage, "model": event.model,
                                             "findings": [f.model_dump() for f in event.findings]})
+                        installed = runner.active if runner.active and runner.active.lab_run_id != before else None
+                        action = event.turn.lab_action
+                        if action and not (installed and action.action == "install"
+                                           and action.slug == installed.spec.slug):
+                            result = await runner.control(LabControlInput(slug=action.slug, action=action.action), user)
+                            yield _sse("lab", {"slug": action.slug, "action": action.action, "result": result})
+                        elif installed:  # the model installed a lab via lab_control during the turn
+                            status_ = await runner.control(LabControlInput(slug=installed.spec.slug, action="status"),
+                                                           user)
+                            status_.pop("coaching_for_tutor_only", None)  # the learner's UI must not get the answers
+                            yield _sse("lab", {"slug": installed.spec.slug, "action": "install", "result": status_})
             except anthropic.APIStatusError as e:
                 yield _sse("error", {"status": e.status_code, "message": e.message})
             except anthropic.APIConnectionError:

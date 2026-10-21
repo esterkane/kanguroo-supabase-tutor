@@ -197,13 +197,14 @@ def _words(text: str) -> set[str]:
 
 
 def _question_in_text(question: str, text: str) -> bool:
-    """The model may reword next_question slightly in the Markdown (e.g. add a parenthesis); accept the
-    text when it ends with a question sharing most of next_question's content words."""
+    """The model may word next_question differently from the Markdown: reworded, or as a self-contained
+    version that repeats the scenario. Accept the text when one of its last questions shares at least half of
+    the content words of the shorter of the two."""
     asked = [s for s in sentences(split_markdown(text)[0]) if s.endswith("?")]
     want = _words(question)
     if not asked or not want:
         return False
-    return max(len(want & _words(s)) / len(want) for s in asked[-2:]) >= 0.6
+    return max(len(want & _words(s)) / max(1, min(len(want), len(_words(s)))) for s in asked[-2:]) >= 0.5
 
 
 def check_citations(turn: TutorTurn, ctx: GuardContext) -> list[GuardFinding]:

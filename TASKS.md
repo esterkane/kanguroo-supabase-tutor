@@ -34,7 +34,11 @@ is green and the task's test exists. Skill to load is in brackets.
 - [x] T1.9 `frontend/src/tutor` — chat panel, lesson sidebar (objective, main path / rabbit hole / return point), ledger view, Mermaid renderer, mode switches (hint/show me/skip/neutral/rabbit hole/recap/exam/slower/faster) [tutor-viz]
   - Done incl. login (local Supabase Auth), session resume, SSE streaming with tool chips and guard
     rewrites, lab console (`POST /tutor/lab/sql`) with EXPLAIN plan tree, labs panel, ledger tab.
-- [ ] T1.10 First-turn flow: persona intro + ONE opening question; then request-flow lesson; then lab 01 handed over [socratic-tutor-loop]
+- [x] T1.10 First-turn flow: persona intro + ONE opening question; then request-flow lesson; then lab 01 handed over [socratic-tutor-loop]
+  - Done: onboarding step derived per session (opening → request_flow → lab_handover) until lab 01 was handed
+    over once; handover via lab_control install (model sees the real report), `lab` SSE event, console preset.
+  - [ ] Decide: PostgreSQL's own hint on 42501 ("GRANT SELECT ON lab01.orders TO authenticated") gives lab 01
+    away in the console. Keep (real server output) or show hints only after the learner asks?
 - [ ] T1.11 Evals: `evals/grounding.jsonl` (30), `evals/socratic.jsonl` (15), `evals/safety.jsonl` (10) + `scripts/eval.py` [tutor-evals]
   - Include incident→lesson cases from `docs/examples/slow-query-tutoring-path.md` (one question per turn,
     credit-then-correct, "what this does not prove", meaning-preserving fix).

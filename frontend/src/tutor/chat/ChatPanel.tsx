@@ -25,7 +25,9 @@ export function ChatPanel({ chat, s, onSend }: { chat: ChatState; s: Strings; on
     <section className="flex min-h-0 flex-1 flex-col" aria-label="chat">
       <div className="flex-1 space-y-3 overflow-y-auto p-3">
         {chat.items.map((item) =>
-          item.kind === "user" ? (
+          item.kind === "notice" ? (
+            <p key={item.id} className="text-center font-mono text-[11px] text-emerald-400">{item.text}</p>
+          ) : item.kind === "user" ? (
             <div key={item.id} className="ml-auto max-w-[85%] rounded bg-zinc-800 px-3 py-2 text-sm whitespace-pre-wrap">
               {item.text}
             </div>

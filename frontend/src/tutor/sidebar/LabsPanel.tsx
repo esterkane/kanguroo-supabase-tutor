@@ -5,9 +5,21 @@ import type { LabInfo } from "../types";
 
 type Action = "install" | "status" | "check";
 
-export function LabsPanel({ api, sessionId, s }: { api: TutorApi; sessionId: string; s: Strings }) {
+export interface LabOutput {
+  slug: string;
+  action: string;
+  body: Record<string, unknown>;
+}
+
+export function LabsPanel({ api, sessionId, s, handover }: {
+  api: TutorApi; sessionId: string; s: Strings; handover?: LabOutput | null;
+}) {
   const [labs, setLabs] = useState<LabInfo[]>([]);
-  const [out, setOut] = useState<{ slug: string; action: Action; body: Record<string, unknown> } | null>(null);
+  const [out, setOut] = useState<LabOutput | null>(handover ?? null);
+
+  useEffect(() => {
+    if (handover) setOut(handover);  // the tutor installed a lab: show its customer report here
+  }, [handover]);
 
   useEffect(() => {
     api.labs().then((r) => setLabs(r.labs)).catch(() => setLabs([]));

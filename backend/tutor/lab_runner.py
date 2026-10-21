@@ -56,8 +56,8 @@ DENY: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(?:^|;)\s*(?:commit|end|abort|rollback|begin|start\s+transaction|savepoint|release|"
                 r"prepare\s+transaction)\b", re.IGNORECASE | re.MULTILINE),
      "transaction control is handled by the runner (use persist for declared steps)"),
-    (re.compile(r"\b(?:set|reset)\s+(?:local\s+|session\s+)?(?:role|session\s+authorization)\b", re.IGNORECASE),
-     "choose the role with the `role` argument instead"),
+    (re.compile(r"\bset\s+(?:session\s+)?role\b|\breset\s+role\b|\bsession\s+authorization\b", re.IGNORECASE),
+     "use the `role` argument, or SET LOCAL ROLE inside the statement"),
     (re.compile(r"\\!|\\c\b|\\connect\b", re.IGNORECASE), "psql meta-commands are not supported"),
 ]
 
@@ -68,11 +68,31 @@ SIGNAL_OWN = re.compile(r"select\s+pg_(terminate|cancel)_backend\(\s*(\d+)\s*\)\
 NO_TRANSACTION = {"vacuum"}
 
 
+# SET LOCAL ROLE is transaction-scoped (and the runner rolls back), so switching between the roles the tool
+# offers inside one statement is fine, e.g. set up as postgres, then query as authenticated.
+LOCAL_ROLE = re.compile(r"\bset\s+local\s+role\s+\"?(\w+)", re.IGNORECASE)
+SWITCHABLE_ROLES = {"anon", "authenticated", "service_role", "postgres"}
+
+
 def deny_reason(sql: str) -> str | None:
+    for role in LOCAL_ROLE.findall(sql):
+        if role.lower() not in SWITCHABLE_ROLES:
+            return f"SET LOCAL ROLE is limited to {', '.join(sorted(SWITCHABLE_ROLES))}"
     for pattern, reason in DENY:
         if pattern.search(sql):
             return reason
     return None
+
+
+# Lab READMEs show psql-style evidence blocks (begin; ...; rollback;). The runner rolls back anyway, so exactly
+# that wrapper is unwrapped; any other transaction control stays refused by DENY.
+ROLLBACK_WRAPPER = re.compile(r"^\s*(?:begin|start\s+transaction)\s*;(?P<body>.*?)(?:rollback|abort)\s*;?\s*$",
+                              re.IGNORECASE | re.DOTALL)
+
+
+def unwrap_rollback(sql: str) -> str:
+    m = ROLLBACK_WRAPPER.match(sql)
+    return m.group("body").strip() if m else sql
 
 
 def statement_kind(sql: str) -> str:
@@ -225,7 +245,7 @@ class LabRunner:
                    detail=e.diag.message_detail, hint=e.diag.message_hint)
 
     async def run_sql(self, args: RunLabSqlInput, user_id: UUID) -> dict[str, Any]:
-        sql = args.sql.strip()
+        sql = unwrap_rollback(args.sql.strip())
         out: dict[str, Any] = {"ok": True, "role": args.role, "claims": args.claims,
                                "statement": statement_kind(sql), "rows": [], "truncated": False,
                                "row_count": None, "persisted": False, "database": "lab"}

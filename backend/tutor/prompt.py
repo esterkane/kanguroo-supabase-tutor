@@ -28,6 +28,31 @@ CURRICULUM = Path(__file__).resolve().parents[2] / "docs" / "curriculum.yaml"
 SEP = "\n\n---\n\n"
 
 Mode = Literal["lesson", "incident", "exam", "neutral", "rabbit_hole"]
+OnboardingStep = Literal["opening", "request_flow", "lab_handover"]
+ONBOARDING_LAB = "01-rls-vs-grant"
+
+# The first-session path from the master instructions' STARTING INSTRUCTION, one step per state.
+# The app derives the step (service.py: TurnStore.progress); these lines tell the model what completes it.
+ONBOARDING: dict[str, str] = {
+    "opening": "Onboarding step 1 of 3 (opening): follow the FIRST TURN section exactly.",
+    "request_flow": (
+        "Onboarding step 2 of 3 (request-flow lesson): build on the learner's answer to the opening question and "
+        "trace one request: client -> Supabase API -> Auth (JWT) -> PostgREST switches to the role from the JWT -> "
+        "GRANT check -> RLS policy -> table. One layer per turn, prediction before explanation, cite search_docs. "
+        "Show the whole path once as a sequenceDiagram in `diagrams`. When the learner can say which layer answers "
+        "42501 and which one filters rows, hand over the lab in that same turn: call lab_control with slug "
+        f"\"{ONBOARDING_LAB}\" and action \"install\" before you write the handover, introduce the case from the "
+        "customer report it returns (never from memory) and ask the learner to run the evidence query in the lab "
+        "console and send you the result."
+    ),
+    "lab_handover": (
+        f"Onboarding step 3 of 3 (lab handover): call lab_control with slug \"{ONBOARDING_LAB}\" and action "
+        "\"install\" before you write the handover. It returns the lab's customer report; the app shows that report "
+        "and puts its evidence query into the learner's lab console. Introduce the case from that report in two or "
+        "three sentences (never from memory), ask the learner to run the evidence query and send you the result. "
+        "Do not reveal the cause or the fix."
+    ),
+}
 Language = Literal["de", "en"]
 
 DEFAULT_LEARNER_NAME = "Kleinkünstler"
@@ -58,6 +83,7 @@ class SessionState:
     active_lab: ActiveLab | None = None
     still_wrong: Sequence[str] = ()
     first_turn: bool = False
+    onboarding: OnboardingStep | None = None
     today: date = field(default_factory=date.today)
 
 
@@ -132,7 +158,9 @@ def session_block(state: SessionState) -> str:
     if state.active_lab:
         lab = state.active_lab
         lines.append(f"- Active lab: {lab.slug} — {lab.title} (hints used: {lab.hints_used})")
-    if state.first_turn:
+    if state.onboarding:
+        lines.append(f"- {ONBOARDING[state.onboarding]}")
+    elif state.first_turn:
         lines.append("- First turn of the first session: follow the FIRST TURN section exactly.")
 
     if state.ledger:

@@ -3,7 +3,8 @@ import type { StreamEvent, TranscriptRow, TutorTurn } from "./types";
 
 export type ChatItem =
   | { kind: "user"; id: string; text: string }
-  | { kind: "tutor"; id: string; turn: TutorTurn };
+  | { kind: "tutor"; id: string; turn: TutorTurn }
+  | { kind: "notice"; id: string; text: string };
 
 export interface ToolActivity {
   name: string;
@@ -64,6 +65,11 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         case "turn":
           return { items: [...state.items, { kind: "tutor", id: e.data.turn_id, turn: e.data.turn }],
                    streaming: null, error: null };
+        case "lab": {  // the app ran the turn's lab_action (e.g. onboarding handover of lab 01)
+          const ok = e.data.result.ok !== false;
+          const text = ok ? `lab ${e.data.action}: ${e.data.slug}` : `lab ${e.data.action} failed: ${e.data.slug}`;
+          return { ...state, items: [...state.items, { kind: "notice", id: `lab-${state.items.length}`, text }] };
+        }
         case "error":
           return { ...state, streaming: null, error: e.data.message };
       }

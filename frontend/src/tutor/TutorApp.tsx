@@ -5,8 +5,8 @@ import { LoginForm } from "./auth/LoginForm";
 import { ChatPanel } from "./chat/ChatPanel";
 import { chatReducer, initialChat } from "./chatReducer";
 import { t } from "./i18n";
-import { LabConsole } from "./lab/LabConsole";
-import { LabsPanel } from "./sidebar/LabsPanel";
+import { consolePreset, LabConsole } from "./lab/LabConsole";
+import { type LabOutput, LabsPanel } from "./sidebar/LabsPanel";
 import { Ledger } from "./sidebar/Ledger";
 import { LessonSidebar } from "./sidebar/LessonSidebar";
 import type { LedgerEntry, Session, TutorTurn } from "./types";
@@ -45,6 +45,7 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [tab, setTab] = useState<Tab>("lesson");
   const [fatal, setFatal] = useState<string | null>(null);
+  const [handover, setHandover] = useState<LabOutput | null>(null);
   const authRef = useRef<AuthSession | null>(null);
 
   useEffect(() => {
@@ -93,7 +94,13 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
     if (!session) return;
     dispatch({ type: "send", id: crypto.randomUUID(), text });
     try {
-      await api.turn(session.id, text, (event) => dispatch({ type: "stream", event }));
+      await api.turn(session.id, text, (event) => {
+        dispatch({ type: "stream", event });
+        if (event.event === "lab" && event.data.result.ok !== false) {
+          setHandover({ slug: event.data.slug, action: event.data.action, body: event.data.result });
+          setTab("lab");
+        }
+      });
       api.ledger().then((r) => setLedger(r.entries)).catch(() => undefined);
     } catch (e) {
       dispatch({ type: "fail", message: e instanceof ApiError && e.status === 503 ? s.noKey : String(e) });
@@ -138,9 +145,11 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
               )}
               {tab === "lab" && (
                 <>
-                  <LabsPanel api={api} sessionId={session.id} s={s} />
+                  <LabsPanel api={api} sessionId={session.id} s={s} handover={handover} />
                   <h2 className="text-xs uppercase tracking-wide text-zinc-500">{s.console}</h2>
-                  <LabConsole api={api} sessionId={session.id} s={s} onSend={send} />
+                  <LabConsole key={handover ? `${handover.slug}-${handover.action}` : "console"} api={api}
+                              sessionId={session.id} s={s} onSend={send}
+                              preset={typeof handover?.body.scenario === "string" ? consolePreset(handover.body.scenario) : null} />
                 </>
               )}
               {tab === "ledger" && <Ledger entries={ledger} s={s} onReview={(topic) => send(`recap ${topic}`)} />}

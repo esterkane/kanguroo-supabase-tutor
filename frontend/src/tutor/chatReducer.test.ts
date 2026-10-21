@@ -33,3 +33,9 @@ test("error ends the stream and load rebuilds the transcript", () => {
   expect(s.items).toEqual([{ kind: "user", id: "1", text: "Hallo" }, { kind: "tutor", id: "2", turn: turn("Antwort") }]);
   expect(s.error).toBeNull();
 });
+
+test("lab event adds a notice after the turn", () => {
+  const s = chatReducer(initialChat, { type: "stream", event: { event: "lab",
+    data: { slug: "01-rls-vs-grant", action: "install", result: { ok: true } } } });
+  expect(s.items).toEqual([{ kind: "notice", id: "lab-0", text: "lab install: 01-rls-vs-grant" }]);
+});
