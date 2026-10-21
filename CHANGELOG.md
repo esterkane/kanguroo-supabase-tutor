@@ -56,3 +56,10 @@
   only for the runner's own lab sessions, VACUUM as a declared non-transactional step, timeouts on checks.
 - 2026-10-21 Repo published: github.com/esterkane/kanguroo-supabase-tutor (public); repo-local git identity is
   the GitHub no-reply address.
+- 2026-10-21 T1.8 router: `backend/tutor/router.py` (POST /session, GET /session/{id}, POST /turn as SSE with
+  token/tool_call/tool_result_summary/rewrite/turn/error, GET /ledger, GET /labs, POST /lab/{slug}/{action}),
+  `auth.py` (Supabase JWKS, asymmetric algorithms only, role authenticated), `service.py` (TutorService, TurnStore
+  persisting API messages verbatim in order, one LabRunner per session, one turn at a time per session);
+  migration 20261021030000 (turn.message jsonb, turn.seq, role 'system') + pgTAP 004; `make dev-user` creates a
+  local dev learner (credentials only in .env); `make dev` loads .env.local + .env. Verified end-to-end with a
+  real local Auth token; /turn returns 503 until ANTHROPIC_API_KEY is set. 10 new tests.

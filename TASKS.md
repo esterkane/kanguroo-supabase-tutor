@@ -28,7 +28,9 @@ is green and the task's test exists. Skill to load is in brackets.
 - [x] T1.7 `backend/tutor/lab_runner.py` — SAVEPOINT sandbox, role switch, claims, EXPLAIN capture, deny-list, 5 s statement_timeout [broken-labs]
   - Implement `backend.tutor.tools.LabTools` (`run_sql` + `control`: install/reset/status/hint/check/list)
     and pass it as `ToolContext.lab`; until then both lab tools return "not available" to the model.
-- [ ] T1.8 `backend/tutor/router.py` — `POST /turn` (SSE), `GET /session/{id}`, `GET /ledger`, `POST /lab/{slug}/{action}`; JWT verification via Supabase JWKS [socratic-tutor-loop]
+- [x] T1.8 `backend/tutor/router.py` — `POST /turn` (SSE), `GET /session/{id}`, `GET /ledger`, `POST /lab/{slug}/{action}`; JWT verification via Supabase JWKS [socratic-tutor-loop]
+  - Done: POST /session, GET /session/{id}, POST /turn (SSE), GET /ledger, GET /labs, POST /lab/{slug}/{action};
+    ES256 JWKS verification; verbatim message storage (migration 20261021030000). `/internal/refresh` moves to T1.12.
 - [ ] T1.9 `frontend/src/tutor` — chat panel, lesson sidebar (objective, main path / rabbit hole / return point), ledger view, Mermaid renderer, mode switches (hint/show me/skip/neutral/rabbit hole/recap/exam/slower/faster) [tutor-viz]
 - [ ] T1.10 First-turn flow: persona intro + ONE opening question; then request-flow lesson; then lab 01 handed over [socratic-tutor-loop]
 - [ ] T1.11 Evals: `evals/grounding.jsonl` (30), `evals/socratic.jsonl` (15), `evals/safety.jsonl` (10) + `scripts/eval.py` [tutor-evals]

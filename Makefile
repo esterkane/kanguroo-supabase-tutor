@@ -49,9 +49,13 @@ turn: env ## one real tutor turn (uses API tokens): make turn Q="Hallo" [ARGS="-
 refresh: ## re-fetch changed docs only
 	$(MAKE) ingest
 
-dev: ## backend :$(API_PORT) + frontend :$(WEB_PORT)
-	(uv run uvicorn backend.main:app --reload --port $(API_PORT) &) && cd frontend && \
+dev: env ## backend :$(API_PORT) + frontend :$(WEB_PORT) (loads .env.local and .env)
+	($(WITH_ENV) { [ -f .env ] && set -a && . ./.env && set +a; true; } && \
+	  uv run uvicorn backend.main:app --reload --port $(API_PORT) &) && cd frontend && \
 	  TUTOR_API_PORT=$(API_PORT) npm run dev -- --port $(WEB_PORT) --strictPort
+
+dev-user: env ## create/sign in the local dev learner (credentials kept in .env); ARGS=--print-token
+	@$(WITH_ENV) { [ -f .env ] && set -a && . ./.env && set +a; true; } && $(PY) scripts/dev_user.py $(ARGS)
 
 smoke: env ## stack reachable, schema + seed present, search callable, lab roles + lab 01 ok
 	$(WITH_ENV) $(PY) scripts/smoke.py
@@ -79,4 +83,4 @@ check: ## lint + all tests (needs the stack running for pgTAP)
 evals: ## full eval suite (uses API tokens)
 	$(PY) scripts/eval.py --all
 
-.PHONY: help env seed up down reset olist ingest search turn refresh dev smoke test-db test-labs lint check evals
+.PHONY: help env seed up down reset olist dev-user ingest search turn refresh dev smoke test-db test-labs lint check evals
