@@ -37,6 +37,7 @@ MAX_ROWS = 200
 STATEMENT_TIMEOUT_MS = 5000
 MAX_LAB_TIMEOUT_MS = 30000
 SESSION_TTL_S = 120
+MAX_SESSION_TTL_S = 900  # lock labs keep their blocker open long enough to investigate
 
 DENY: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\b(?:create|drop|alter)\s+database\b", re.IGNORECASE), "database DDL is not allowed in the lab"),
@@ -59,6 +60,12 @@ DENY: list[tuple[re.Pattern[str], str]] = [
      "choose the role with the `role` argument instead"),
     (re.compile(r"\\!|\\c\b|\\connect\b", re.IGNORECASE), "psql meta-commands are not supported"),
 ]
+
+
+# Signalling a backend is allowed only for sessions this runner opened in the lab DB (see _signal_session).
+SIGNAL_OWN = re.compile(r"select\s+pg_(terminate|cancel)_backend\(\s*(\d+)\s*\)\s*;?", re.IGNORECASE)
+# Statements PostgreSQL refuses inside a transaction block; run in autocommit, only as declared persistent steps.
+NO_TRANSACTION = {"vacuum"}
 
 
 def deny_reason(sql: str) -> str | None:
@@ -96,6 +103,9 @@ class LabSpec:
     statement_timeout_ms: int = STATEMENT_TIMEOUT_MS
     hypotheses: tuple[dict[str, str], ...] = ()
     requires: tuple[str, ...] = ()  # dataset schemas in the lab DB, e.g. olist
+    # Sessions the lab opens at install and leaves inside an open transaction (e.g. a stuck job).
+    scenario_sessions: tuple[dict[str, str], ...] = ()
+    session_ttl_s: int = SESSION_TTL_S
 
     @property
     def schema(self) -> str:
@@ -117,6 +127,8 @@ def load_labs(root: Path = LABS) -> dict[str, LabSpec]:
             statement_timeout_ms=min(timeout, MAX_LAB_TIMEOUT_MS),
             hypotheses=tuple(spec.get("hypotheses", [])),
             requires=tuple(spec.get("requires", [])),
+            scenario_sessions=tuple(spec.get("scenario_sessions", [])),
+            session_ttl_s=min(int(spec.get("session_ttl_s", SESSION_TTL_S)), MAX_SESSION_TTL_S),
         )
     return labs
 
@@ -132,6 +144,7 @@ class ActiveLab:
 @dataclass
 class NamedSession:
     conn: AsyncConnection
+    pid: int = 0
     opened: float = field(default_factory=time.monotonic)
     expiry: asyncio.Task[None] | None = None
 
@@ -216,6 +229,8 @@ class LabRunner:
         out: dict[str, Any] = {"ok": True, "role": args.role, "claims": args.claims,
                                "statement": statement_kind(sql), "rows": [], "truncated": False,
                                "row_count": None, "persisted": False, "database": "lab"}
+        if signal := SIGNAL_OWN.fullmatch(sql):
+            return await self._signal_session(signal.group(1).lower(), int(signal.group(2)), args, out, user_id)
         if reason := deny_reason(sql):
             return {"ok": False, "refused": True, "reason": reason, "role": args.role, "database": "lab"}
         if args.session:
@@ -226,6 +241,8 @@ class LabRunner:
             declared = list(self.active.spec.persistent_steps) if self.active else []
             out["persist_note"] = (f"not persisted: '{out['statement']}' is not a declared persistent step "
                                    f"(declared: {declared or 'none'}; install a lab first)")
+        if out["statement"] in NO_TRANSACTION:
+            return await self._run_without_transaction(args, sql, out, persist_allowed, user_id)
         started = time.monotonic()
         async with self.pool.connection() as conn:
             try:
@@ -247,17 +264,73 @@ class LabRunner:
         await self._log(user_id, args, sql, out)
         return out
 
+    async def _run_without_transaction(self, args: RunLabSqlInput, sql: str, out: dict[str, Any],
+                                       persist_allowed: bool, user_id: UUID) -> dict[str, Any]:
+        """VACUUM cannot run in a transaction block, so it can never be rolled back: declared steps only."""
+        if not (args.persist and persist_allowed):
+            out.update(ok=False, refused=True,
+                       reason=f"{out['statement'].upper()} cannot run inside the runner's rolled-back transaction; "
+                              "it is only available where the lab declares it as a persistent step "
+                              "(call again with persist=true)")
+            return out
+        if not single_statement(sql):
+            out.update(ok=False, refused=True, reason=f"{out['statement'].upper()} must be sent on its own")
+            return out
+        started = time.monotonic()
+        async with self.pool.connection() as conn:  # autocommit; session settings are discarded on return
+            try:
+                await conn.execute(f"set statement_timeout = {self._timeout_ms()}")
+                if args.role != "postgres":
+                    await conn.execute(f"set role {args.role}")
+                await self._execute(conn, sql, out)
+                out["persisted"] = True
+            except psycopg.Error as e:
+                self._error(out, e)
+        out["ms"] = round((time.monotonic() - started) * 1000, 1)
+        await self._log(user_id, args, sql, out)
+        return out
+
+    async def _signal_session(self, kind: str, pid: int, args: RunLabSqlInput, out: dict[str, Any],
+                              user_id: UUID) -> dict[str, Any]:
+        """Real pg_terminate_backend / pg_cancel_backend, but only for a lab session this runner opened."""
+        name = next((n for n, sess in self.sessions.items() if sess.pid == pid), None)
+        if name is None:
+            return {"ok": False, "refused": True, "database": "lab", "role": args.role,
+                    "reason": f"pid {pid} is not a session this lab opened; only lab sessions can be signalled here "
+                              "(other backends may belong to the tutor itself)"}
+        started = time.monotonic()
+        async with self.pool.connection() as conn:
+            cur = conn.cursor(row_factory=dict_row)
+            await cur.execute(f"select pg_{kind}_backend(%s)".encode(), (pid,))
+            out["rows"] = await cur.fetchall()
+            out["row_count"] = 1
+        out["ms"] = round((time.monotonic() - started) * 1000, 1)
+        out["signalled_session"] = name
+        if kind == "terminate":
+            await self._close_session(name)  # its connection is gone; drop our handle
+        await self._log(user_id, args, sql=f"select pg_{kind}_backend({pid})", out=out)
+        return out
+
     # ------------------------------------------------------------------ named sessions
+    def _session_ttl_s(self) -> int:
+        return self.active.spec.session_ttl_s if self.active else SESSION_TTL_S
+
+    async def _open_session(self, name: str, application_name: str | None = None) -> NamedSession:
+        conn = await AsyncConnection.connect(self.lab_url, autocommit=False)
+        await conn.execute(f"set statement_timeout = {self._timeout_ms()}")
+        await conn.execute(f"set lock_timeout = {self._lock_timeout_ms()}")
+        if application_name:
+            await conn.execute("select set_config('application_name', %s, false)", (application_name,))
+        row = await (await conn.execute("select pg_backend_pid()")).fetchone()
+        await conn.commit()  # the settings above are session-level; start the lab transaction clean
+        session = self.sessions[name] = NamedSession(conn, pid=row[0] if row else 0)
+        session.expiry = asyncio.create_task(self._expire(name, session, self._session_ttl_s()))
+        return session
+
     async def _run_in_session(self, args: RunLabSqlInput, sql: str, out: dict[str, Any],
                               user_id: UUID) -> dict[str, Any]:
         name = args.session or "a"
-        session = self.sessions.get(name)
-        if session is None:
-            conn = await AsyncConnection.connect(self.lab_url, autocommit=False)
-            await conn.execute(f"set statement_timeout = {self._timeout_ms()}")
-            await conn.execute(f"set lock_timeout = {self._lock_timeout_ms()}")
-            session = self.sessions[name] = NamedSession(conn)
-            session.expiry = asyncio.create_task(self._expire(name, session))
+        session = self.sessions.get(name) or await self._open_session(name)
         conn = session.conn
         out["session"] = name
         out["session_open_s"] = round(time.monotonic() - session.opened, 1)
@@ -273,12 +346,12 @@ class LabRunner:
             self._error(out, e)
         out["ms"] = round((time.monotonic() - started) * 1000, 1)
         out["note"] = (f"session '{name}' keeps its transaction (and locks) open until "
-                       f"lab_control reset or {SESSION_TTL_S}s")
+                       f"lab_control reset or {self._session_ttl_s()}s")
         await self._log(user_id, args, sql, out)
         return out
 
-    async def _expire(self, name: str, session: NamedSession) -> None:
-        await asyncio.sleep(SESSION_TTL_S)
+    async def _expire(self, name: str, session: NamedSession, ttl_s: int) -> None:
+        await asyncio.sleep(ttl_s)
         if self.sessions.get(name) is session:
             await self._close_session(name)
 
@@ -289,7 +362,10 @@ class LabRunner:
         if session.expiry and session.expiry is not asyncio.current_task():
             session.expiry.cancel()
         try:
-            await session.conn.rollback()
+            if not session.conn.closed:
+                await session.conn.rollback()
+        except psycopg.Error:
+            pass  # e.g. the backend was terminated: nothing left to roll back
         finally:
             await session.conn.close()
 
@@ -325,6 +401,9 @@ class LabRunner:
             await conn.execute(f"drop schema if exists {spec.schema} cascade".encode())
             await conn.execute(setup.encode())
         self.active = ActiveLab(spec, lab_run_id=await self._start_run(spec, user_id))
+        for scenario in spec.scenario_sessions:  # e.g. a job that holds locks and stays idle in transaction
+            session = await self._open_session(scenario["name"], scenario.get("application_name"))
+            await session.conn.execute(scenario["sql"].encode())
         return {"ok": True, "installed": spec.slug, "title": spec.title,
                 "scenario": (spec.path / "README.md").read_text(encoding="utf-8")}
 
@@ -355,7 +434,9 @@ class LabRunner:
         checks = (spec.path / "checks.sql").read_text(encoding="utf-8")
         lines: list[str] = []
         try:
-            async with self.pool.connection() as conn:
+            async with self.pool.connection() as conn:  # settings are discarded when the connection returns
+                await conn.execute(f"set statement_timeout = {self._timeout_ms()}")
+                await conn.execute(f"set lock_timeout = {self._lock_timeout_ms()}")
                 cur = conn.cursor()
                 await cur.execute(checks.encode())
                 while True:

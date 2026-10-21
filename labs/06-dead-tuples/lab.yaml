@@ -1,0 +1,15 @@
+slug: 06-dead-tuples
+phase: I
+title: '"Same rows, bigger table, slower queries" — autovacuum off, dead tuples piling up'
+difficulty: medium
+est_minutes: 35
+topics: [autovacuum-and-bloat, mvcc-snapshots, explain-analyze-reading]
+requires: [olist]                  # make olist
+persistent_steps: [alter, vacuum, analyze]
+hypotheses:
+  - h: "More orders were imported"
+    discriminating_test: "count(*) is still 99,441, the number of real Olist orders"
+  - h: "Old row versions from updates are never cleaned up"
+    discriminating_test: "pg_stat_user_tables.n_dead_tup is ~10x n_live_tup; last_autovacuum is empty"
+  - h: "Autovacuum runs but a long transaction holds back cleanup"
+    discriminating_test: "No old xact_start / backend_xmin in pg_stat_activity, and reloptions shows autovacuum_enabled=false"

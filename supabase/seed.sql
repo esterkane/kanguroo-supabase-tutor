@@ -75,5 +75,13 @@ insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setu
 on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
 
 insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
+  ('05-lock-contention', 'I', '"Marking orders delivered times out" — an export job holding row locks, idle in transaction', 'medium', 40, array['blocking-and-deadlocks', 'long-transactions', 'lock-levels-ddl', 'mvcc-snapshots']::text[], 'labs/05-lock-contention/setup.sql')
+on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
+
+insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
+  ('06-dead-tuples', 'I', '"Same rows, bigger table, slower queries" — autovacuum off, dead tuples piling up', 'medium', 35, array['autovacuum-and-bloat', 'mvcc-snapshots', 'explain-analyze-reading']::text[], 'labs/06-dead-tuples/setup.sql')
+on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
+
+insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
   ('09-revenue-join-fanout', 'A', '"Revenue is 28 % too high" — join fan-out on real Olist orders', 'easy', 25, array['sql-select-joins', 'aggregation-grouping']::text[], 'labs/09-revenue-join-fanout/setup.sql')
 on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;

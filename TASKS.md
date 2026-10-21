@@ -49,9 +49,9 @@ Synthetic additions (identities, volume growth) are always labelled as such in t
   → composite index 0.3 ms on Saru's Mac
 - [ ] O4 Workload lab (phase H): generate repeated real queries, find the top query in `pg_stat_statements`
   by total vs mean time (needs the extension in the lab DB, created by the import script, not by learners)
-- [ ] O5 Locks lab (phase I, = T2.3 lab 05) on `olist.orders`: open transaction in session a updating an order,
+- [x] O5 Locks lab (phase I, = T2.3 lab 05) on `olist.orders`: open transaction in session a updating an order,
   session b blocked → `pg_locks` / `pg_blocking_pids` / lock_timeout 55P03 (runner sessions exist)
-- [ ] O6 Dead tuples lab (phase I, = T2.3 lab 06): mass status updates on the grown table with autovacuum off for
+- [x] O6 Dead tuples lab (phase I, = T2.3 lab 06): mass status updates on the grown table with autovacuum off for
   that table → `n_dead_tup`, bloat, VACUUM
 - [ ] O7 RLS through the real API (phase D): a slice of Olist in the main local stack exposed via PostgREST;
   JWTs for synthetic app_users; the real-data trap that `customer_id` is per order while the person is

@@ -1,0 +1,22 @@
+slug: 05-lock-contention
+phase: I
+title: '"Marking orders delivered times out" — an export job holding row locks, idle in transaction'
+difficulty: medium
+est_minutes: 40
+topics: [blocking-and-deadlocks, long-transactions, lock-levels-ddl, mvcc-snapshots]
+requires: [olist]                  # make olist
+persistent_steps: [create, alter]
+session_ttl_s: 900                 # the stuck job stays for 15 minutes unless you end it
+scenario_sessions:
+  - name: job
+    application_name: nightly-export
+    # Locks every shipped order (1,107 real rows) and then just sits there, as a job does while it
+    # uploads a file or waits on an API between statements.
+    sql: "select count(*) from lab05.export_batch()"
+hypotheses:
+  - h: "The table is too big / the update is slow"
+    discriminating_test: "The update touches one row by primary key; EXPLAIN shows an index scan. It waits, it does not work."
+  - h: "Another transaction holds a lock the update needs"
+    discriminating_test: "pg_stat_activity shows 'idle in transaction' (application nightly-export) for minutes; the row's xmax equals that backend's backend_xid"
+  - h: "A schema change (DDL) is queued in front"
+    discriminating_test: "pg_locks shows no AccessExclusiveLock request on lab05.orders; only RowShareLock from the export session"

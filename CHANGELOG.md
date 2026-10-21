@@ -48,3 +48,11 @@
   both ways; labs declare `requires: [olist]` (skipped/explained when missing); ADR-011; TASKS O1–O11.
   Reference tutoring path for building the support lab (`prompts/examples/support_lab_plan.md`).
 - 2026-10-21 Proposed reuse backlog R1–R10 from Saru's other repos in TASKS.md (survey, not scheduled).
+- 2026-10-21 O5 + O6 real-data ops labs. Lab 05 lock contention: a real `nightly-export` session holds FOR UPDATE
+  row locks idle in transaction; the webhook update gets 55P03; evidence via pg_stat_activity and xmax = backend_xid;
+  fix = terminate the job, lock-free export, lock_timeout on the function. Lab 06 dead tuples: autovacuum off +
+  10 status-sync rewrites → 994,410 dead tuples, 155 MB vs 14 MB; VACUUM clears them but not the size (stretch:
+  VACUUM FULL). Runner: lab scenario sessions (application_name, TTL up to 15 min), pg_terminate/cancel_backend
+  only for the runner's own lab sessions, VACUUM as a declared non-transactional step, timeouts on checks.
+- 2026-10-21 Repo published: github.com/esterkane/kanguroo-supabase-tutor (public); repo-local git identity is
+  the GitHub no-reply address.
