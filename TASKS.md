@@ -18,7 +18,7 @@ is green and the task's test exists. Skill to load is in brackets.
 
 - [x] T1.1 `scripts/ingest_llms.py` end-to-end against local stack (dry-run → real); record `embedding_model` [llms-txt-ingest]
 - [x] T1.2 `backend/tutor/retrieval.py` `Retriever` protocol + `PgHybridRetriever`; unit test with 3 fixture chunks [hybrid-search-pgvector]
-- [ ] T1.3 `backend/tutor/tools.py` — `search_docs`, `web_search` (gated), `run_lab_sql`, `ledger_read`, `ledger_update`, `lab_control` with JSON schemas from `prompts/tools.md` [socratic-tutor-loop]
+- [x] T1.3 `backend/tutor/tools.py` — `search_docs`, `web_search` (gated), `run_lab_sql`, `ledger_read`, `ledger_update`, `lab_control` with JSON schemas from `prompts/tools.md` [socratic-tutor-loop]
 - [ ] T1.4 `backend/tutor/prompt.py` — assembles system prompt from `prompts/` (master + runtime + mode + ledger summary + session language) [socratic-tutor-loop]
   - Persona voice + few-shots: `prompts/persona/kaenguru_persona.yaml` (from the AuDHS Tutor). Its
     `system_prompt` names AI/ML/LLMs/web dev as the subject; override that line with Supabase/PostgreSQL,
@@ -26,6 +26,8 @@ is green and the task's test exists. Skill to load is in brackets.
 - [ ] T1.5 `backend/tutor/orchestrator.py` — Claude tool loop with streaming; emits `TutorTurn`; max 6 tool calls/turn [socratic-tutor-loop]
 - [ ] T1.6 `backend/tutor/guard.py` — citation coverage, secret scan, destructive-SQL warning, exactly-one-question, incident headings [socratic-tutor-loop]
 - [ ] T1.7 `backend/tutor/lab_runner.py` — SAVEPOINT sandbox, role switch, claims, EXPLAIN capture, deny-list, 5 s statement_timeout [broken-labs]
+  - Implement `backend.tutor.tools.LabTools` (`run_sql` + `control`: install/reset/status/hint/check/list)
+    and pass it as `ToolContext.lab`; until then both lab tools return "not available" to the model.
 - [ ] T1.8 `backend/tutor/router.py` — `POST /turn` (SSE), `GET /session/{id}`, `GET /ledger`, `POST /lab/{slug}/{action}`; JWT verification via Supabase JWKS [socratic-tutor-loop]
 - [ ] T1.9 `frontend/src/tutor` — chat panel, lesson sidebar (objective, main path / rabbit hole / return point), ledger view, Mermaid renderer, mode switches (hint/show me/skip/neutral/rabbit hole/recap/exam/slower/faster) [tutor-viz]
 - [ ] T1.10 First-turn flow: persona intro + ONE opening question; then request-flow lesson; then lab 01 handed over [socratic-tutor-loop]

@@ -17,3 +17,6 @@
   Embedder / Reranker protocols, Ollama + OpenAI embedders, PgHybridRetriever, search_docs product
   aliases); fix: hybrid_search pins hnsw.iterative_scan + ef_search (filtered searches returned 0 semantic
   hits) — migration 20261021020000 + pgTAP 003; 7 retrieval tests (offline + 3 fixture chunks in local DB).
+- 2026-10-21 T1.3 tools: `backend/tutor/tools.py` (TOOLS == prompts/tools.md, pydantic input models, dispatch
+  with 6-call / 2-web budget, gated web_search with untrusted wrapping + domain tiers), `ledger.py` (PgLedger
+  via `set local role authenticated` + claims, RLS-enforced), `db.as_user`; 23 new tests incl. owner-only ledger.
