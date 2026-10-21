@@ -18,12 +18,17 @@ from backend.tutor.schemas import Chunk
 from backend.tutor.tools import TOOLS, ToolContext
 from backend.tutor.turn_parser import FenceSplitter, TurnParseError, parse_turn, split_reply
 
-TURN_JSON = {"mode": "lesson", "language": "de", "persona_on": True,
+TURN_JSON: dict[str, Any] = {"mode": "lesson", "language": "de", "persona_on": True,
              "speech": "Welche Kontrolle prüfst du zuerst?", "next_question": "Welche Kontrolle prüfst du zuerst?"}
 
 
 def answer(markdown: str, turn: dict[str, Any] | None = None) -> str:
-    return f"{markdown}\n\n```json tutor_turn\n{json.dumps(turn or TURN_JSON)}\n```"
+    """A contract-conforming reply: Markdown ending with the question, then the JSON block."""
+    turn = turn or TURN_JSON
+    question = str(turn.get("next_question") or "")
+    if markdown and question and question not in markdown:
+        markdown = f"{markdown}\n\n{question}"
+    return f"{markdown}\n\n```json tutor_turn\n{json.dumps(turn)}\n```"
 
 
 def message(content: list[dict[str, Any]], stop: str = "end_turn") -> BetaMessage:
@@ -120,7 +125,7 @@ def test_fence_splitter_releases_backticks_that_are_not_the_fence() -> None:
 def test_parse_turn_fills_text_from_markdown() -> None:
     md, js = split_reply(answer("**Markdown** answer"))
     turn = parse_turn(md, js)
-    assert turn.text == "**Markdown** answer" and turn.guard_flags == []
+    assert turn.text == "**Markdown** answer\n\nWelche Kontrolle prüfst du zuerst?" and turn.guard_flags == []
 
 
 @pytest.mark.parametrize(("reply", "fragment"), [
@@ -139,10 +144,11 @@ async def test_simple_turn_streams_markdown_only_and_builds_request() -> None:
     client = FakeClient([text_reply("Kleinkünstler, GRANT ist der Schlüssel.")])
     events = await run(client)
     tokens = "".join(e.text for e in events if isinstance(e, o.Token))
-    assert tokens.strip() == "Kleinkünstler, GRANT ist der Schlüssel."
+    assert tokens.strip() == "Kleinkünstler, GRANT ist der Schlüssel.\n\nWelche Kontrolle prüfst du zuerst?"
     final = events[-1]
     assert isinstance(final, o.Final)
-    assert final.turn.text == "Kleinkünstler, GRANT ist der Schlüssel."
+    assert final.turn.text.startswith("Kleinkünstler, GRANT ist der Schlüssel.")
+    assert final.turn.guard_flags == [] and final.findings == []
     assert [m["role"] for m in final.new_messages] == ["user", "system", "assistant"]
     assert final.new_messages[1]["content"].startswith("# MODE: lesson")
     assert final.usage["cache_read_input_tokens"] == 50
@@ -164,7 +170,9 @@ async def test_tool_loop_passes_thinking_back_unchanged() -> None:
         {"type": "thinking", "thinking": "", "signature": "sig-abc"},
         {"type": "tool_use", "id": "toolu_1", "name": "search_docs", "input": {"query": "42501 grant"}},
     ], stop="tool_use"))
-    client = FakeClient([first, text_reply("Es fehlt das GRANT [1].")])
+    cited = {**TURN_JSON, "citations": [{"n": 1, "url": "https://supabase.com/docs/guides/troubleshooting/x.md#a",
+                                         "title": "Missing grants", "tier": 1}]}
+    client = FakeClient([first, text_reply("Es fehlt das GRANT [1].", turn=cited)])
     events = await run(client, c=ctx(retriever))
 
     assert [type(e).__name__ for e in events if not isinstance(e, o.Token)] == \
@@ -193,12 +201,12 @@ async def test_history_is_append_only_across_turns() -> None:
 
 
 async def test_invalid_turn_gets_one_repair_then_unstructured() -> None:
+    first_md = "Antwort ohne Block. Welche Kontrolle prüfst du zuerst?"
     fixed = FakeStream([], message([{"type": "text", "text": answer("")}]))
-    client = FakeClient([FakeStream(["Antwort ohne Block."], message([{"type": "text", "text": "Antwort ohne Block."}])),
-                         fixed])
+    client = FakeClient([FakeStream([first_md], message([{"type": "text", "text": first_md}])), fixed])
     final = (await run(client))[-1]
     assert isinstance(final, o.Final)
-    assert final.turn.text == "Antwort ohne Block." and final.turn.guard_flags == []
+    assert final.turn.text == first_md and final.turn.guard_flags == []
     repair = client.requests[1]["messages"][-1]
     assert repair["role"] == "user" and repair["content"].startswith("[app message, not from the learner]")
 
@@ -232,7 +240,7 @@ async def test_unparseable_stream_is_reissued() -> None:
     bad = FakeStream(["Ich schau"], message([]), fail=True)
     client = FakeClient([bad, text_reply("Fertig.")])
     final = (await run(client))[-1]
-    assert isinstance(final, o.Final) and final.turn.text == "Fertig."
+    assert isinstance(final, o.Final) and final.turn.text.startswith("Fertig.")
     assert len(client.requests) == 2 and len(client.requests[1]["messages"]) == 2  # nothing appended
 
 

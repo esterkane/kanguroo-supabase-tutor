@@ -24,7 +24,7 @@ is green and the task's test exists. Skill to load is in brackets.
     `system_prompt` names AI/ML/LLMs/web dev as the subject; override that line with Supabase/PostgreSQL,
     fill `{learner_name}`, and keep the "neutral on request" few-shot.
 - [x] T1.5 `backend/tutor/orchestrator.py` — Claude tool loop with streaming; emits `TutorTurn`; max 6 tool calls/turn [socratic-tutor-loop]
-- [ ] T1.6 `backend/tutor/guard.py` — citation coverage, secret scan, destructive-SQL warning, exactly-one-question, incident headings [socratic-tutor-loop]
+- [x] T1.6 `backend/tutor/guard.py` — citation coverage, secret scan, destructive-SQL warning, exactly-one-question, incident headings [socratic-tutor-loop]
 - [ ] T1.7 `backend/tutor/lab_runner.py` — SAVEPOINT sandbox, role switch, claims, EXPLAIN capture, deny-list, 5 s statement_timeout [broken-labs]
   - Implement `backend.tutor.tools.LabTools` (`run_sql` + `control`: install/reset/status/hint/check/list)
     and pass it as `ToolContext.lab`; until then both lab tools return "not available" to the model.

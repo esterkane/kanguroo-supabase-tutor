@@ -111,3 +111,11 @@ class TutorTurn(_Strict):
     incident: Incident | None = None
     session_end: SessionEnd | None = None
     guard_flags: list[str] = Field(default_factory=list)
+
+
+class GuardFinding(_Strict):
+    """One violated TutorTurn invariant. `block` triggers one rewrite request; `warn` is only recorded."""
+
+    code: str
+    severity: Literal["block", "warn"]
+    fix_hint: str

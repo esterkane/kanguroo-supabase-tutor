@@ -31,3 +31,8 @@
   (prompt.py split); `drop_block` as safety net. Contract change: the model omits `text` from the JSON (app
   fills it). Reference tutoring path from Saru's slow-query session added (`prompts/examples/`,
   `docs/examples/`). `make turn Q=...` for a live turn. 16 new tests (fake client, real SDK types).
+- 2026-10-21 T1.6 guard: `backend/tutor/guard.py` checks one question, citation markers vs entries, cited URLs
+  must come from a tool (tier not inflated, tier 4 labelled), uncited price/plan/limit/version claims,
+  secrets (JWT, sb_secret_, sk-ant-, real connection passwords), destructive SQL / disabled RLS outside a
+  `> ⚠ Risk:` block, incident model, speech length/markup, claimed execution without run_lab_sql. Block →
+  one rewrite (`Rewrite` event for the UI), then flagged; secrets always redacted. 33 tests.

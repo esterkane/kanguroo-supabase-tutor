@@ -16,8 +16,9 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 
+from backend.tutor import guard
 from backend.tutor.prompt import SessionState, system_blocks, turn_system_text
-from backend.tutor.schemas import TutorTurn
+from backend.tutor.schemas import GuardFinding, TutorTurn
 from backend.tutor.tools import TOOLS, ToolContext, TurnBudget, dispatch
 from backend.tutor.turn_parser import FenceSplitter, TurnParseError, parse_turn, split_reply
 
@@ -56,14 +57,22 @@ class ToolResultSummary:
 
 
 @dataclass(frozen=True)
+class Rewrite:
+    """The guard rejected the streamed answer; the UI should replace it with what streams next."""
+
+    codes: list[str]
+
+
+@dataclass(frozen=True)
 class Final:
     turn: TutorTurn
     new_messages: list[Message]
     usage: dict[str, int] = field(default_factory=dict)
     model: str = ""
+    findings: list[GuardFinding] = field(default_factory=list)
 
 
-TurnEvent = Token | ToolCall | ToolResultSummary | Final
+TurnEvent = Token | ToolCall | ToolResultSummary | Rewrite | Final
 
 
 # ----------------------------------------------------------------------------- helpers
@@ -149,6 +158,7 @@ class Orchestrator:
         usage: dict[str, int] = {}
         markdown = ""
         repaired = False
+        guard_retried = False
         stream_retries = 0
         model_used = self.model
 
@@ -206,14 +216,27 @@ class Orchestrator:
                 turn = parse_turn(markdown, json_text)
             except TurnParseError as e:
                 if repaired:
-                    yield Final(fallback_turn(state, markdown, "unstructured"), new, usage, model_used)
+                    turn = guard.redact_secrets(fallback_turn(state, markdown, "unstructured"))
+                    yield Final(turn, new, usage, model_used)
                     return
                 repaired = True
                 new.append({"role": "user", "content": (
                     f"[app message, not from the learner] {e}. Reply with only the corrected "
                     "```json tutor_turn block for your previous answer (without `text`).")})
                 continue
-            yield Final(turn, new, usage, model_used)
+
+            gctx = guard.GuardContext(sources=guard.collect_sources(history + new),
+                                      ran_lab_sql=guard.ran_tool(new, "run_lab_sql"))
+            findings = guard.check(turn, gctx)
+            blocking = [f for f in findings if f.severity == "block"]
+            if blocking and not guard_retried:
+                guard_retried = True
+                yield Rewrite(sorted({f.code for f in blocking}))
+                new.append({"role": "user", "content": guard.repair_message(findings)})
+                continue
+            turn = guard.redact_secrets(turn).model_copy(
+                update={"guard_flags": sorted({f.code for f in findings})})
+            yield Final(turn, new, usage, model_used, findings)
             return
 
         yield Final(fallback_turn(state, markdown or REFUSAL_TEXT[state.language], "tool_loop_limit"),
