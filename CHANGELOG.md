@@ -20,3 +20,7 @@
 - 2026-10-21 T1.3 tools: `backend/tutor/tools.py` (TOOLS == prompts/tools.md, pydantic input models, dispatch
   with 6-call / 2-web budget, gated web_search with untrusted wrapping + domain tiers), `ledger.py` (PgLedger
   via `set local role authenticated` + claims, RLS-enforced), `db.as_user`; 23 new tests incl. owner-only ledger.
+- 2026-10-21 T1.4 prompt: `backend/tutor/prompt.py` builds `system` blocks — cached static prefix (master +
+  persona voice retargeted to Supabase/PostgreSQL + runtime + TutorTurn schema + 63 topic slugs), cached mode
+  block, uncached session state (date, language, objective, ledger weakest/recent, lab, still-wrong);
+  persona few-shots dropped (off-topic). 13 tests.
