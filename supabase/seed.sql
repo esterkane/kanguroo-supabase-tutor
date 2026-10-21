@@ -69,3 +69,11 @@ on conflict (slug) do update set phase = excluded.phase, title = excluded.title,
 insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
   ('01-rls-vs-grant', 'D', '"RLS is broken" — missing GRANT behind a correct policy', 'easy', 20, array['rls-vs-grants', 'sqlstate-42501', 'postgrest-role-switching', 'policy-select']::text[], 'labs/01-rls-vs-grant/setup.sql')
 on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
+
+insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
+  ('04-missing-index', 'H', '"Order history got slow" — filter + ORDER BY + LIMIT without a matching index', 'medium', 35, array['explain-analyze-reading', 'index-types-selectivity', 'estimates-vs-actuals']::text[], 'labs/04-missing-index/setup.sql')
+on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
+
+insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
+  ('09-revenue-join-fanout', 'A', '"Revenue is 28 % too high" — join fan-out on real Olist orders', 'easy', 25, array['sql-select-joins', 'aggregation-grouping']::text[], 'labs/09-revenue-join-fanout/setup.sql')
+on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;

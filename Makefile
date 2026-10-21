@@ -34,6 +34,11 @@ reset: ## db reset + lab DB recreate
 ingest: env ## fill the corpus from llms.txt (ARGS="--dry-run" etc.)
 	$(WITH_ENV) $(PY) scripts/ingest_llms.py $(ARGS)
 
+olist: env ## import the Olist e-commerce dataset into the lab DB (CSV files in data/olist/)
+	$(WITH_ENV) $(PY) scripts/import_olist.py
+	@$(WITH_ENV) for s in $$(grep -l 'requires:.*olist' labs/*/lab.yaml | xargs -n1 dirname | xargs -n1 basename); do \
+	  $(PY) scripts/lab.py install $$s; done
+
 search: env ## query the corpus: make search Q="permission denied 42501"
 	$(WITH_ENV) $(PY) scripts/search.py "$(Q)"
 
@@ -57,7 +62,9 @@ test-db: ## pgTAP (schema) + lab checks in both directions
 
 test-labs: env ## every lab's checks.sql must FAIL on fresh setup and PASS after solution.sql
 	@$(WITH_ENV) for d in labs/*/; do s=$$(basename $$d); \
-	  $(PY) scripts/lab.py install $$s >/dev/null; \
+	  $(PY) scripts/lab.py install $$s >/dev/null; rc=$$?; \
+	  if [ $$rc -eq 3 ]; then echo "skip $$s (dataset missing: make olist)"; continue; fi; \
+	  [ $$rc -eq 0 ] || { echo "FAIL $$s: install failed"; exit 1; }; \
 	  if $(PY) scripts/lab.py check $$s >/dev/null; then echo "FAIL $$s: checks pass while broken"; exit 1; fi; \
 	  $(PY) scripts/lab.py solve $$s >/dev/null; \
 	  $(PY) scripts/lab.py check $$s >/dev/null || { echo "FAIL $$s: checks fail after solution"; exit 1; }; \
@@ -72,4 +79,4 @@ check: ## lint + all tests (needs the stack running for pgTAP)
 evals: ## full eval suite (uses API tokens)
 	$(PY) scripts/eval.py --all
 
-.PHONY: help env seed up down reset ingest search turn refresh dev smoke test-db test-labs lint check evals
+.PHONY: help env seed up down reset olist ingest search turn refresh dev smoke test-db test-labs lint check evals

@@ -58,7 +58,20 @@ def cmd_list() -> None:
         print(f"{spec['slug']:<24} phase {spec['phase']}  {spec.get('difficulty', ''):<6}  {spec['title']}")
 
 
+DATASET_HINT = {"olist": "make olist (download kaggle.com/datasets/olistbr/brazilian-ecommerce into data/olist/ first)"}
+
+
+def missing_requirements(slug: str) -> list[str]:
+    """Datasets (schemas in the lab DB) a lab reads from but that are not imported yet."""
+    required = yaml.safe_load((lab_dir(slug) / "lab.yaml").read_text()).get("requires", [])
+    with psycopg.connect(lab_url()) as conn:
+        return [r for r in required if not (conn.execute("select to_regnamespace(%s)", (r,)).fetchone() or [None])[0]]
+
+
 def cmd_install(slug: str) -> None:
+    if missing := missing_requirements(slug):
+        print(f"skip {slug}: needs dataset(s) {missing}; run " + "; ".join(DATASET_HINT.get(m, m) for m in missing))
+        sys.exit(3)
     path = lab_dir(slug)
     run_script(f"drop schema if exists {schema_of(slug)} cascade;\n" + (path / "setup.sql").read_text())
     print(f"installed {slug}")

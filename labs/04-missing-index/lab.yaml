@@ -1,0 +1,15 @@
+slug: 04-missing-index
+phase: H
+title: '"Order history got slow" — filter + ORDER BY + LIMIT without a matching index'
+difficulty: medium
+est_minutes: 35
+topics: [explain-analyze-reading, index-types-selectivity, estimates-vs-actuals]
+requires: [olist]                  # make olist
+persistent_steps: [create, analyze]
+hypotheses:
+  - h: "The database is under-provisioned / the machine is busy"
+    discriminating_test: "Run the query alone, twice; EXPLAIN (ANALYZE, BUFFERS) shows the time is spent reading ~2M rows"
+  - h: "Statistics are stale, so the planner picks a bad plan"
+    discriminating_test: "ANALYZE lab04.orders and re-run EXPLAIN: the plan does not change, there is no usable index"
+  - h: "No index supports filtering by customer and ordering by purchase time"
+    discriminating_test: "Seq Scan + Sort in the plan; an index on (customer_unique_id) alone still sorts, (customer_unique_id, order_purchase_timestamp desc) removes the Sort"

@@ -21,9 +21,10 @@ from uuid import UUID
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from anthropic import AsyncAnthropic
-from db import admin_url
+from db import admin_url, lab_url
 from psycopg_pool import AsyncConnectionPool
 
+from backend.tutor.lab_runner import LabRunner, lab_pool
 from backend.tutor.ledger import PgLedger
 from backend.tutor.orchestrator import Final, Orchestrator, Token, ToolCall, ToolResultSummary
 from backend.tutor.prompt import SessionState
@@ -43,9 +44,11 @@ async def main() -> None:
 
     state = SessionState(mode=args.mode, language=args.lang, persona_on=args.mode != "neutral",
                          first_turn=args.first_turn)
-    async with AsyncConnectionPool(admin_url(), min_size=1, max_size=2) as pool:
+    async with AsyncConnectionPool(admin_url(), min_size=1, max_size=2) as pool, \
+            lab_pool(lab_url(), min_size=1, max_size=2) as labs:
+        runner = LabRunner(labs, lab_url())
         ctx = ToolContext(user_id=DEV_LEARNER, retriever=PgHybridRetriever(pool, embedder_from_env()),
-                          ledger=PgLedger(pool))
+                          ledger=PgLedger(pool), lab=runner)
         orch = Orchestrator(client=AsyncAnthropic())
         print(f"[model {orch.model}, effort {orch.effort}]\n")
         async for event in orch.run_turn(history=[], user_text=args.message, state=state, ctx=ctx):

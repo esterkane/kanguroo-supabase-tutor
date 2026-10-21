@@ -36,3 +36,15 @@
   secrets (JWT, sb_secret_, sk-ant-, real connection passwords), destructive SQL / disabled RLS outside a
   `> ⚠ Risk:` block, incident model, speech length/markup, claimed execution without run_lab_sql. Block →
   one rewrite (`Rewrite` event for the UI), then flagged; secrets always redacted. 33 tests.
+- 2026-10-21 T1.7 lab runner: `backend/tutor/lab_runner.py` implements `LabTools` — run_lab_sql in the `lab`
+  DB as anon/authenticated/postgres with claims, savepoint per statement, rolled back unless lab.yaml declares
+  the step persistent, ≤200 rows, EXPLAIN (ANALYZE, BUFFERS) JSON, 5 s statement / 4 s lock timeout,
+  deny-list (DB/role DDL, cluster-wide effects, file access, transaction control, role switching), named
+  sessions a/b holding locks ≤120 s; lab_control list/install/reset/status/hint/check with tutor.lab_run
+  bookkeeping (tests[], hints_used, outcome) via RLS. `make turn` now has lab tools. 31 tests.
+- 2026-10-21 Hands-on real-data track: Olist dataset downloaded (Kaggle, 44.7 MB, gitignored), `make olist`
+  imports staging + typed schema + synthetic app_users into the lab DB (~7 s); lab 09 revenue join fan-out
+  (real 28.2 % inflation) and lab 04 missing index (real orders grown 20×; 37 ms → 0.3 ms) with pgTAP checks
+  both ways; labs declare `requires: [olist]` (skipped/explained when missing); ADR-011; TASKS O1–O11.
+  Reference tutoring path for building the support lab (`prompts/examples/support_lab_plan.md`).
+- 2026-10-21 Proposed reuse backlog R1–R10 from Saru's other repos in TASKS.md (survey, not scheduled).

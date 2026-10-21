@@ -1,0 +1,15 @@
+slug: 09-revenue-join-fanout
+phase: A
+title: '"Revenue is 28 % too high" — join fan-out on real Olist orders'
+difficulty: easy
+est_minutes: 25
+topics: [sql-select-joins, aggregation-grouping]
+requires: [olist]                  # make olist
+persistent_steps: [create]         # create or replace view
+hypotheses:
+  - h: "Cancelled or undelivered orders are included"
+    discriminating_test: "The view already filters order_status = 'delivered'; count statuses to confirm"
+  - h: "Instalment payments are counted once per instalment"
+    discriminating_test: "payment_installments is a number on one row; compare rows per order in order_payments"
+  - h: "Joining order_items multiplies every payment by the number of items (fan-out)"
+    discriminating_test: "Count rows per order_id after the join vs payments per order; inflation only on multi-item orders"

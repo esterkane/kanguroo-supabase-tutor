@@ -76,3 +76,14 @@ Short form. Revisit when the "Revisit when" condition triggers.
   fewer prerequisite. `supabase test db` still runs pgTAP for the main schema.
 - **Constraint:** `lab.py solve` splits `solution.sql` on a `;` at line end and continues past errors
   (the "before" query fails on purpose), so lab SQL keeps one statement terminator per line end.
+
+## ADR-011 Real datasets live in the lab database; synthetic additions are labelled
+
+- **Decision:** Hands-on lessons use real data (first: Olist e-commerce, `make olist`) imported into the
+  disposable `lab` DB, so `run_lab_sql` and the learner see the same real rows, plans and errors. Anything
+  the dataset lacks (login identities, production-like volume) is added synthetically and said so in the
+  lab README and table comments (`olist.app_users`, `lab04.orders` growth).
+- **Why:** Saru wants lessons testable on real data and real system conditions, with no simulated outputs;
+  the lab DB already has the sandbox (roles, claims, timeouts, deny-list).
+- **Constraint:** Auth/PostgREST/Storage/Realtime/Edge Function lessons need the main local stack; giving the
+  runner a second target is a separate decision (TASKS O7).
