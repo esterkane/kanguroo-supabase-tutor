@@ -40,6 +40,10 @@ def test_question_rules() -> None:
     many = f"Warum? Wieso? Weshalb?\n\n{Q} [1]"
     assert codes(turn(text=many))["MULTI_QUESTION"] == "warn"
     assert codes(turn(text="GRANT und RLS [1]."))["QUESTION_NOT_IN_TEXT"] == "warn"
+    reworded = turn(next_question="Welche der beiden Kontrollen, GRANT oder RLS-Policy, prüfst du zuerst?",
+                    text="GRANT und RLS [1].\n\nWelche der beiden Kontrollen, GRANT (Tabellenprivileg) oder "
+                         "RLS-Policy, würdest du als Erstes prüfen, und warum? Ein Satz genügt.")
+    assert "QUESTION_NOT_IN_TEXT" not in codes(reworded)
 
 
 # ----------------------------------------------------------------------------- citations

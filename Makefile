@@ -11,8 +11,10 @@ WITH_ENV := set -a && . ./.env.local && set +a && export SUPABASE_DB_URL="$$DB_U
 help: ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n",$$1,$$2}'
 
-env: ## export local Supabase URLs/keys into .env.local (never commit)
+env: ## export local Supabase URLs/keys into .env.local + public frontend settings (never commit)
 	@$(SUPABASE) status -o env > .env.local 2>/dev/null || { echo "stack not running: make up"; exit 1; }
+	@set -a && . ./.env.local && set +a && printf 'VITE_SUPABASE_URL=%s\nVITE_SUPABASE_PUBLISHABLE_KEY=%s\n' \
+	  "$$API_URL" "$${PUBLISHABLE_KEY:-$$ANON_KEY}" > frontend/.env.local
 
 seed: ## regenerate supabase/seed.sql from curriculum + labs
 	$(PY) scripts/seed.py

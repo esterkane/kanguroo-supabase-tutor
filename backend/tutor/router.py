@@ -8,6 +8,7 @@ POST /turn                 one tutor turn as Server-Sent Events:
 GET  /ledger               mastery ledger, weakest first
 GET  /labs                 available labs
 POST /lab/{slug}/{action}  install | reset | status | hint | check for the session's lab
+POST /lab/sql              the learner's own SQL in the same lab sandbox the tutor uses (lab console)
 """
 from __future__ import annotations
 
@@ -24,7 +25,7 @@ from sse_starlette import EventSourceResponse
 
 from backend.tutor.orchestrator import Final, Rewrite, Token, ToolCall, ToolResultSummary
 from backend.tutor.service import TutorService
-from backend.tutor.tools import LabControlInput, ToolContext
+from backend.tutor.tools import LabControlInput, LabRole, RunLabSqlInput, ToolContext
 
 router = APIRouter(tags=["tutor"])
 
@@ -56,6 +57,17 @@ class TurnRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_id: UUID
     text: str = Field(min_length=1, max_length=20000)
+
+
+class LabSql(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    session_id: UUID
+    sql: str = Field(min_length=1, max_length=20000)
+    role: LabRole = "authenticated"
+    claims: dict[str, Any] | None = None
+    explain: bool = False
+    persist: bool = False  # honoured only for steps the active lab declares persistent
+    session: str | None = Field(default=None, max_length=20)
 
 
 async def _session_or_404(svc: TutorService, user: UUID, session_id: UUID) -> dict[str, Any]:
@@ -92,6 +104,14 @@ async def lab_action(slug: str, action: Literal["install", "reset", "status", "h
                      svc: Svc, user: User) -> dict[str, Any]:
     await _session_or_404(svc, user, session_id)
     return await svc.runner(session_id).control(LabControlInput(slug=slug, action=action), user)
+
+
+@router.post("/lab/sql")
+async def lab_sql(body: LabSql, svc: Svc, user: User) -> dict[str, Any]:
+    await _session_or_404(svc, user, body.session_id)
+    args = RunLabSqlInput(sql=body.sql, role=body.role, claims=body.claims, explain=body.explain,
+                          persist=body.persist, session=body.session)
+    return await svc.runner(body.session_id).run_sql(args, user)
 
 
 def _sse(event: str, data: Any) -> dict[str, str]:

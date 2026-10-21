@@ -31,7 +31,9 @@ is green and the task's test exists. Skill to load is in brackets.
 - [x] T1.8 `backend/tutor/router.py` — `POST /turn` (SSE), `GET /session/{id}`, `GET /ledger`, `POST /lab/{slug}/{action}`; JWT verification via Supabase JWKS [socratic-tutor-loop]
   - Done: POST /session, GET /session/{id}, POST /turn (SSE), GET /ledger, GET /labs, POST /lab/{slug}/{action};
     ES256 JWKS verification; verbatim message storage (migration 20261021030000). `/internal/refresh` moves to T1.12.
-- [ ] T1.9 `frontend/src/tutor` — chat panel, lesson sidebar (objective, main path / rabbit hole / return point), ledger view, Mermaid renderer, mode switches (hint/show me/skip/neutral/rabbit hole/recap/exam/slower/faster) [tutor-viz]
+- [x] T1.9 `frontend/src/tutor` — chat panel, lesson sidebar (objective, main path / rabbit hole / return point), ledger view, Mermaid renderer, mode switches (hint/show me/skip/neutral/rabbit hole/recap/exam/slower/faster) [tutor-viz]
+  - Done incl. login (local Supabase Auth), session resume, SSE streaming with tool chips and guard
+    rewrites, lab console (`POST /tutor/lab/sql`) with EXPLAIN plan tree, labs panel, ledger tab.
 - [ ] T1.10 First-turn flow: persona intro + ONE opening question; then request-flow lesson; then lab 01 handed over [socratic-tutor-loop]
 - [ ] T1.11 Evals: `evals/grounding.jsonl` (30), `evals/socratic.jsonl` (15), `evals/safety.jsonl` (10) + `scripts/eval.py` [tutor-evals]
   - Include incident→lesson cases from `docs/examples/slow-query-tutoring-path.md` (one question per turn,

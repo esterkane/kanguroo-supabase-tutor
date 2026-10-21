@@ -159,3 +159,17 @@ async def test_lab_endpoints_use_the_sessions_runner(api: Any, users: tuple[UUID
     state = await svc.session_state(a, await svc.store.session(a, UUID(sid)), [])
     assert state.active_lab is not None and state.active_lab.slug == "01-rls-vs-grant"
     assert (await client.get("/tutor/ledger", headers=auth(a))).json() == {"entries": []}
+
+
+async def test_lab_console_runs_in_the_sessions_sandbox(api: Any, users: tuple[UUID, UUID]) -> None:
+    client, _, _ = api
+    a, b = users
+    sid = (await client.post("/tutor/session", json={}, headers=auth(a))).json()["id"]
+    await client.post(f"/tutor/lab/01-rls-vs-grant/install?session_id={sid}", headers=auth(a))
+    body = {"session_id": sid, "sql": "select * from lab01.orders",
+            "claims": {"sub": "11111111-1111-1111-1111-111111111111", "role": "authenticated"}}
+    res = (await client.post("/tutor/lab/sql", json=body, headers=auth(a))).json()
+    assert res["sqlstate"] == "42501" and res["database"] == "lab"
+    refused = (await client.post("/tutor/lab/sql", json={**body, "sql": "drop database lab"}, headers=auth(a))).json()
+    assert refused["refused"] is True
+    assert (await client.post("/tutor/lab/sql", json=body, headers=auth(b))).status_code == 404

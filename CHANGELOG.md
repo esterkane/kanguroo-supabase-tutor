@@ -63,3 +63,9 @@
   migration 20261021030000 (turn.message jsonb, turn.seq, role 'system') + pgTAP 004; `make dev-user` creates a
   local dev learner (credentials only in .env); `make dev` loads .env.local + .env. Verified end-to-end with a
   real local Auth token; /turn returns 503 until ANTHROPIC_API_KEY is set. 10 new tests.
+- 2026-10-21 T1.9 browser UI: login against local Supabase Auth, session resume/new, chat with SSE streaming
+  (tool chips, guard rewrite note), Markdown/GFM, lazy strict Mermaid with fallback, citations with tiers,
+  sidebar tabs (lesson path + mode commands, labs, ledger), lab console via new `POST /tutor/lab/sql` (same
+  sandbox as the tutor) with EXPLAIN plan tree and "send to tutor"; de/en strings. Verified in the browser
+  with a live turn and lab 04's real plan. Fixes: effect returned scrollIntoView's Promise (Chromium crash);
+  guard QUESTION_NOT_IN_TEXT now tolerates reworded questions. `make env` writes frontend/.env.local.

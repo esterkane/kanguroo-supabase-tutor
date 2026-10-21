@@ -187,9 +187,23 @@ def check_questions(turn: TutorTurn) -> list[GuardFinding]:
     if len(asked) > 2:
         findings.append(_f("MULTI_QUESTION", "warn", f"{len(asked)} questions in the text; ask one, rhetorical "
                                                      "ones count for the learner too."))
-    if q and q.rstrip("?").strip().lower()[:40] not in turn.text.lower():
+    if q and not _question_in_text(q, turn.text):
         findings.append(_f("QUESTION_NOT_IN_TEXT", "warn", "Put next_question at the end of the Markdown too."))
     return findings
+
+
+def _words(text: str) -> set[str]:
+    return {w for w in re.findall(r"\w+", text.lower()) if len(w) > 3}
+
+
+def _question_in_text(question: str, text: str) -> bool:
+    """The model may reword next_question slightly in the Markdown (e.g. add a parenthesis); accept the
+    text when it ends with a question sharing most of next_question's content words."""
+    asked = [s for s in sentences(split_markdown(text)[0]) if s.endswith("?")]
+    want = _words(question)
+    if not asked or not want:
+        return False
+    return max(len(want & _words(s)) / len(want) for s in asked[-2:]) >= 0.6
 
 
 def check_citations(turn: TutorTurn, ctx: GuardContext) -> list[GuardFinding]:

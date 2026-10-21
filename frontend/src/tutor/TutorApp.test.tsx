@@ -1,10 +1,60 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { TutorApp } from "./TutorApp";
 
-test("renders the shell and starts a health check", () => {
-  globalThis.fetch = vi.fn(() => new Promise<Response>(() => {}));
-  render(<TutorApp apiBase="/tutor" />);
-  expect(screen.getByText("Känguru Tutor")).toBeTruthy();
-  expect(screen.getByTestId("health").textContent).toContain("checking");
-  expect(globalThis.fetch).toHaveBeenCalledWith("/healthz");
+function fakeSupabase(signedIn: boolean): SupabaseClient {
+  const session = signedIn ? { access_token: "tok", user: { id: "user-1" } } : null;
+  return {
+    auth: {
+      getSession: async () => ({ data: { session } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+      signInWithPassword: async () => ({ error: null }),
+      signOut: async () => ({ error: null }),
+    },
+  } as unknown as SupabaseClient;
+}
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+function sse(...events: [string, unknown][]) {
+  const text = events.map(([e, d]) => `event: ${e}\r\ndata: ${JSON.stringify(d)}\r\n\r\n`).join("");
+  return new Response(new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(text)); c.close(); } }),
+                      { headers: { "Content-Type": "text/event-stream" } });
+}
+
+afterEach(() => vi.restoreAllMocks());
+
+test("signed out shows the login form", async () => {
+  render(<TutorApp supabase={fakeSupabase(false)} apiBase="/tutor" />);
+  expect(await screen.findByRole("button", { name: "Anmelden" })).toBeTruthy();
+});
+
+test("signed in: creates a session, streams a turn and renders it with sources", async () => {
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    calls.push(`${init?.method ?? "GET"} ${url}`);
+    expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer tok");
+    if (url === "/tutor/session") return json({ id: "s1", objective: null, mode: "lesson", language: "de",
+                                                persona_on: true, started_at: "now" }, 201);
+    if (url === "/tutor/ledger") return json({ entries: [] });
+    if (url === "/tutor/turn") return sse(
+      ["token", { text: "Kleinkünstler, " }],
+      ["tool_call", { name: "search_docs", input: { query: "42501" } }],
+      ["turn", { turn_id: "t1", model: "m", usage: {}, turn: {
+        mode: "lesson", language: "de", persona_on: true, speech: "s", diagrams: [], ledger_delta: [],
+        guard_flags: [], next_question: "Welche Kontrolle?",
+        text: "Kleinkünstler, GRANT zuerst [1].\n\nWelche Kontrolle?",
+        citations: [{ n: 1, url: "https://supabase.com/docs/guides/x.md", title: "42501 errors", tier: 1 }] } }],
+    );
+    return json({ detail: "unexpected" }, 500);
+  }));
+  render(<TutorApp supabase={fakeSupabase(true)} apiBase="/tutor" />);
+  const box = await screen.findByRole("textbox", { name: /Antwort oder Frage/ });
+  fireEvent.change(box, { target: { value: "Hallo" } });
+  fireEvent.click(screen.getByRole("button", { name: "Senden" }));
+  await waitFor(() => expect(screen.getByText("42501 errors")).toBeTruthy());
+  expect(screen.getByText("Hallo")).toBeTruthy();
+  expect(screen.getByText(/GRANT zuerst/)).toBeTruthy();
+  expect(calls).toContain("POST /tutor/turn");
 });
