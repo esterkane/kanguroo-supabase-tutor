@@ -56,7 +56,10 @@ CLAIM = re.compile(
 )
 LABELLED = re.compile(r"unverified|unverifiziert|nicht verifiziert|community|tier\s*4|fiktiv|fictional|"
                       r"illustrative|illustrativ", re.IGNORECASE)
-COMMUNITY_LABEL = re.compile(r"community|tier\s*4|erfahrungsbericht|forum|github issue", re.IGNORECASE)
+# Any wording that tells the learner this is someone's experience, not current product behaviour.
+COMMUNITY_LABEL = re.compile(r"community|tier\s*4|erfahrung|experience|forum|github[- ]?(?:issue|discussion)|reddit|"
+                             r"stack ?overflow|blog|user report|nutzerbericht|anecdot|inoffiziell|unofficial|"
+                             r"keine offizielle|not (?:an )?official", re.IGNORECASE)
 MARKER = re.compile(r"\[(\d{1,2})\]")
 EXECUTION_CLAIM = re.compile(
     r"\b(?:I|I've|I have)\s+(?:just\s+)?(?:ran|run|executed|tested|checked it in the lab)\b"
@@ -235,14 +238,23 @@ def check_citations(turn: TutorTurn, ctx: GuardContext) -> list[GuardFinding]:
             findings.append(_f("CITATION_TIER_INFLATED", "block",
                                f"[{c.n}] is tier {tool_tier} according to the tool, not tier {c.tier}."))
     community = {c.n for c in turn.citations if max(c.tier, ctx.sources.get(_norm(c.url), 0)) >= 4}
-    if community:
-        prose = split_markdown(turn.text)[0]
-        for s in sentences(prose):
-            if {int(n) for n in MARKER.findall(s)} & community and not COMMUNITY_LABEL.search(s):
-                findings.append(_f("COMMUNITY_UNLABELLED", "block",
-                                   f"Label tier-4 evidence as community evidence in: \"{s[:80]}\""))
-                break
+    if unlabelled := unlabelled_community(turn.text, community):
+        findings.append(_f("COMMUNITY_UNLABELLED", "block",
+                           f"Label tier-4 evidence as community evidence in: \"{unlabelled[:80]}\""))
     return findings
+
+
+def unlabelled_community(text: str, community: set[int]) -> str | None:
+    """First paragraph that cites tier-4 evidence without saying it is community evidence, else None.
+
+    The paragraph is the unit: "The search found a GitHub issue [1]. A comment suggests pinning 2.79 [1]." is
+    labelled; so is "… one person's experience. [5] Don't do that."."""
+    if not community:
+        return None
+    for para in re.split(r"\n\s*\n", split_markdown(text)[0]):
+        if {int(n) for n in MARKER.findall(para)} & community and not COMMUNITY_LABEL.search(para):
+            return para.strip()
+    return None
 
 
 def check_uncited_claims(turn: TutorTurn) -> list[GuardFinding]:

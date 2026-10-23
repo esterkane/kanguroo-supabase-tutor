@@ -1,0 +1,115 @@
+{
+ "case_id": "w01",
+ "turn": {
+  "mode": "incident",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, es gibt ein Community-Issue zu 2.80, aber ich habe nur einen Textauszug gesehen. Das ist noch keine Ursache. Lauf bitte direkt nach dem Reload getSession und poste die Ausgabe. Was siehst du?",
+  "text": "Kleinkünstler, ja, es gibt einen Treffer. Es ist aber nur ein Hinweis und noch keine Diagnose.\n\n**Beobachtet:** Die Suche hat ein GitHub-Issue geliefert, \"AuthSessionMissingError after upgrading to 2.80\", vom 2026-10-12 [1]. Dort schreiben mehrere Leute, sie sähen den Fehler nach einem Reload seit 2.80. Ein Kommentar nennt als Workaround, auf 2.79 zu pinnen [1]. Das ist Community-Evidenz (Tier 4). Ich habe nur den Textauszug gesehen. Ob Maintainer geantwortet haben, ob es eine Ursache gibt oder ob das Issue noch offen ist, weiß ich nicht. Die Nummer im Link sieht für mich ungewöhnlich aus, öffne ihn also selbst und prüfe ihn. Das ist die Verschwörung der Dokumentationsschreiber, nur diesmal ohne Dokumentation.\n\n**Noch nicht bewiesen:** dass 2.80 die Ursache ist. Auch wenn mehrere Leute dasselbe berichten, ist das noch keine Ursache. Ob 2.79 wirklich unbetroffen ist, ist unverified, das müsste man live prüfen. Selbst wenn es stimmt, wäre ein Pin bestenfalls eine Mitigation. Eine Sitzung besteht aus Access- und Refresh-Token, und ein Refresh-Token ist nur einmal verwendbar [2]. Es gibt also mehrere Stellen, an denen sie nach einem Reload \"fehlen\" kann.\n\nDein Reload-Ablauf entscheidet, wo wir ansetzen. Ein Beleg dazu, ohne Tokens oder Secrets:\n\n```js\nconst { data, error } = await supabase.auth.getSession()\nconsole.log(Boolean(data.session), error && error.name)\nconsole.log(Object.keys(localStorage).filter(k => k.includes('auth-token')))\n```\n\nMach das direkt nach dem Reload, vor jedem anderen Auth-Aufruf. Welche Ausgabe bekommst du?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://github.com/supabase/auth-js/issues/99991",
+    "title": "AuthSessionMissingError after upgrading to 2.80",
+    "tier": 4,
+    "fetched_at": "2026-10-23T00:00:00Z"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/auth/sessions.md#what-is-a-session",
+    "title": "User sessions > What is a session?",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:46:16Z"
+   }
+  ],
+  "next_question": "Welche Ausgabe bekommst du, wenn du direkt nach dem Reload getSession() und den localStorage-Schlüssel-Check ausführst?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "incident: AuthSessionMissingError nach Reload"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": {
+   "symptom": "Nutzer erhalten nach Reload AuthSessionMissingError seit Update auf supabase-js 2.80",
+   "expected": "Sitzung wird nach Reload aus dem Speicher wiederhergestellt",
+   "scope": null,
+   "timeline": "Seit Update auf supabase-js 2.80",
+   "environment": null,
+   "evidence": [
+    "Community-Issue (Tier 4, 2026-10-12) berichtet ähnliche Symptome seit 2.80; nur Textauszug gesehen, Status und Maintainer-Antwort unbekannt"
+   ],
+   "hypotheses": [
+    {
+     "h": "Regression in 2.80 bei der Sitzungswiederherstellung",
+     "rank": 1,
+     "test": "getSession() direkt nach Reload, danach Vergleich mit gepinnter 2.79 im lokalen Repro",
+     "status": "open"
+    },
+    {
+     "h": "Sitzungsspeicher (localStorage/Cookies) fehlt oder wird nicht gelesen, z. B. SSR/Cookie-Konfiguration",
+     "rank": 2,
+     "test": "Prüfen, ob der auth-token-Schlüssel nach Reload existiert",
+     "status": "open"
+    },
+    {
+     "h": "Refresh-Token bereits verbraucht oder Sitzung serverseitig beendet",
+     "rank": 3,
+     "test": "Auth-Logs und auth.sessions auf die betroffene Sitzung prüfen",
+     "status": "open"
+    }
+   ],
+   "root_cause": null,
+   "mitigation": null,
+   "permanent_fix": null,
+   "prevention": null,
+   "confidence": "niedrig: nur ein Community-Hinweis, keine eigene Reproduktion"
+  },
+  "session_end": null,
+  "guard_flags": [
+   "COMMUNITY_UNLABELLED"
+  ]
+ },
+ "findings": [
+  "COMMUNITY_UNLABELLED"
+ ],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "AuthSessionMissingError getUser session missing",
+    "products": [
+     "auth"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "web_search",
+   "input": {
+    "query": "supabase-js 2.80 AuthSessionMissingError after reload github issue",
+    "reason": "current_bug"
+   }
+  },
+  {
+   "name": "web_search",
+   "input": {
+    "query": "github supabase/supabase-js issues \"AuthSessionMissingError\" page reload session lost",
+    "reason": "community_case"
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 4865,
+  "cache_creation_input_tokens": 6438,
+  "cache_read_input_tokens": 62661
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null,
+ "web_queries": [
+  "supabase-js 2.80 AuthSessionMissingError after reload github issue",
+  "github supabase/supabase-js issues \"AuthSessionMissingError\" page reload session lost"
+ ]
+}

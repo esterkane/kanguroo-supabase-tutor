@@ -107,3 +107,6 @@
 - 2026-10-23 T2.3 labs 02 (wrong JWT identity), 03 (slow RLS policy), 07 (connection exhaustion, real 53300),
   08 (migration drift) on real Olist data; runner: login-role/idle/count scenario sessions, `lab_control
   reproduce`, timeouts on lab-owned roles only; runner-driven tests for all four.
+- 2026-10-23 T2.4 web search adapter: Brave/Tavily providers, query redaction before sending, tiers per the
+  master instructions (Supabase GitHub issues = community), age/stale labels, snippet cleaning; guard checks
+  community labels per paragraph; eval set `web` 5/5 with fixture results.

@@ -1,0 +1,71 @@
+{
+ "case_id": "w02",
+ "turn": {
+  "mode": "lesson",
+  "language": "en",
+  "persona_on": true,
+  "speech": "Kleinkünstler, there is a CLI release from three days ago that pulls arm64 images on Apple Silicon. That fits your symptom, but it is not proof. Paste the CLI version, uname and Docker architecture. What do they print?",
+  "text": "Kleinkünstler, I can't call this a confirmed bug yet. A release note isn't a root cause, and I'd rather not hand you a fix for a diagnosis nobody has made.\n\nWhat the search turned up:\n- **Candidate fix (official, 3 days old):** the Supabase CLI release v2.121.1 from 2026-10-20 says \"Fix: pull arm64 images for the local stack on Apple Silicon hosts.\" [1] That matches your symptom. It doesn't prove your failure is the same one, or that your CLI predates it.\n- **Stale workaround (community, 2022):** one old issue suggests `DOCKER_DEFAULT_PLATFORM=linux/amd64`. [2] It's four years old and forces emulation, so don't set it yet.\n- **Not found:** the docs corpus has no page on this exact error.\n\nFirst step is evidence. Run this and paste the output:\n\n```sh\nnpx supabase --version; uname -m; docker info --format '{{.Architecture}} {{.OSType}}'\n```\n\nReading the output: `uname -m` shows the host architecture. `docker info` shows what the Docker engine reports. A mismatch between the two would point at the runtime rather than the CLI. Shortcuts around the process are for people with a landlord, not for us.\n\nWhat do those three lines print?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://github.com/supabase/cli/releases/tag/v2.121.1",
+    "title": "Release v2.121.1",
+    "tier": 2,
+    "fetched_at": "2026-10-20"
+   },
+   {
+    "n": 2,
+    "url": "https://github.com/supabase/cli/issues/99996",
+    "title": "supabase start: image platform does not match host (M1)",
+    "tier": 4,
+    "fetched_at": "2022-11-03"
+   }
+  ],
+  "next_question": "What do the CLI version, uname -m and docker info architecture lines print?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "supabase start local stack validation, step 1 of 4"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "supabase start image platform does not match detected host platform Apple Silicon",
+    "products": [
+     "cli",
+     "local-development",
+     "kb"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "web_search",
+   "input": {
+    "query": "supabase cli \"image platform\" \"does not match the detected host platform\" supabase start Apple Silicon",
+    "reason": "current_bug"
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1896,
+  "cache_creation_input_tokens": 10570,
+  "cache_read_input_tokens": 39096
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null,
+ "web_queries": [
+  "supabase cli \"image platform\" \"does not match the detected host platform\" supabase start Apple Silicon"
+ ]
+}

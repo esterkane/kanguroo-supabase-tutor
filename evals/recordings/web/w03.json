@@ -1,0 +1,78 @@
+{
+ "case_id": "w03",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, erst das Passwort zurücksetzen, du hast es gepostet. Port 6543 ist Transaction Mode, dort gehen Prepared Statements nicht. Welche Datenbank-Bibliothek nutzt euer Backend, und in welcher Version?",
+  "text": "Kleinkünstler, zuerst die Sicherheitslage: Du hast das echte Datenbankpasswort in den Chat gepostet. Behandle es als kompromittiert, setze es im Dashboard zurück und trage das neue nur noch in Secrets oder Env-Variablen ein. Die Bürokratie nennt das \"Credential Hygiene\". Ausnahmsweise hat sie recht.\n\nZur Sache: Dein Port 6543 ist der Transaction-Mode-Pooler. Er gibt die Verbindung nach jeder Transaktion zurück in den Pool, Session-Zustand überlebt also nicht [1]. Prepared Statements werden dort nicht unterstützt, der Treiber muss sie abschalten [2]. Mein Verdacht, nicht bewiesen: Dein Treiber legt `s0` auf einer Backend-Verbindung an und sucht es in der nächsten Transaktion auf einer anderen. Der Name `s0` sieht nach automatisch vergebenen Namen eines Treibers aus.\n\nCommunity: Ein Reddit-Beitrag vom 2026-06-02 (Tier 4, 143 Tage alt) berichtet, dass der Wechsel auf Port 5432 (Session Mode) den Fehler beseitigt hat [3]. Das ist eine Erfahrung und keine bestätigte Ursache. Offiziell gibt es pro Treiber eine Einstellung, zum Beispiel `prepare: false` bei Postgres.js und Drizzle oder `pgbouncer=true` bei Prisma [2].\n\nWelche Bibliothek in welcher Version spricht in eurem Backend mit der Datenbank?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/connecting-to-postgres.md#transaction-mode-limitations",
+    "title": "Transaction mode limitations",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:45:50.593386+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/connecting-to-postgres.md#transaction-mode-limitations",
+    "title": "Transaction mode limitations (driver settings table)",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:45:50.593386+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://www.reddit.com/r/Supabase/comments/99993/",
+    "title": "prepared statement does not exist with the pooler (community, 2026-06-02)",
+    "tier": 4,
+    "fetched_at": "2026-10-23T00:00:00Z"
+   }
+  ],
+  "next_question": "Welche Bibliothek in welcher Version spricht in eurem Backend mit der Datenbank?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "prepared statements vs transaction pooling, step 1"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "prepared statement does not exist transaction mode pooler port 6543",
+    "products": [
+     "database",
+     "kb",
+     "platform"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "web_search",
+   "input": {
+    "query": "supabase pooler 6543 'prepared statement \"s0\" does not exist' transaction mode",
+    "reason": "community_case"
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1906,
+  "cache_creation_input_tokens": 3242,
+  "cache_read_input_tokens": 39202
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null,
+ "web_queries": [
+  "supabase pooler 6543 'prepared statement \"s0\" does not exist' transaction mode"
+ ]
+}

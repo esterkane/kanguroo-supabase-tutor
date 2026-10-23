@@ -204,7 +204,8 @@ async def turn(body: TurnRequest, svc: Svc, user: User) -> EventSourceResponse:
                 yield _sse("mode", {"mode": "incident", "reason": "customer_problem"})
             state = await svc.session_state(user, session, history)
             runner = svc.runner(body.session_id)
-            ctx = ToolContext(user_id=user, retriever=svc.retriever, ledger=svc.ledger, lab=runner)
+            ctx = ToolContext(user_id=user, retriever=svc.retriever, ledger=svc.ledger, lab=runner, web=svc.web,
+                              web_enabled=svc.web is not None, learner_text=body.text)
             before = runner.active.lab_run_id if runner.active else None  # detects lab_control installs
             try:
                 async for event in svc.orchestrator().run_turn(history=history, user_text=body.text, state=state,

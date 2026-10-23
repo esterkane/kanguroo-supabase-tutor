@@ -1,0 +1,71 @@
+{
+ "case_id": "w04",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "The community result was a stale 2023 post suggesting to disable RLS, which is not a fix. The official docs point to three causes: a false WITH CHECK, a role mismatch, or a missing SELECT policy when the row is read back. Does the failing insert send a user_id equal to the signed-in user's id?",
+  "text": "**What I found:** the only community result the search returned was a Reddit post from 2023-02-14 (about 3.7 years old, so stale). It says to run `alter table profiles disable row level security`. Don't do that in production. It removes the protection, and it doesn't explain why the insert failed. I found no other community threads on this exact error, so I can't summarise a consensus.\n\nThe official documentation is more useful. It gives three mechanisms that can produce this error on an insert. Treat them as hypotheses until you have evidence.\n\n| Rank | Hypothesis | Why it fits | What would falsify it |\n|---|---|---|---|\n| 1 | The `WITH CHECK` expression is false or NULL for the new row. The usual cause is that `user_id` is missing from the payload, or it differs from `auth.uid()`. | The documented insert policy is `with check ((select auth.uid()) = user_id)`, and it exists so a user can't create a row owned by someone else. [1] | The payload's `user_id` equals the caller's `auth.uid()`, and the insert still fails. |\n| 2 | No insert policy applies to the requesting role. For example, the policy says `to authenticated` but the request arrives as `anon` with no valid session. | The documented policy is scoped `to authenticated`, and the table grants go to `authenticated`. [1] | The request carries a valid user JWT, so the role is `authenticated`. |\n| 3 | The insert asks for the row back (`RETURNING`), and no `SELECT` policy covers the new row. | The Storage troubleshooting page describes this for `INSERT ... RETURNING *`. The missing `SELECT` policy fails the whole statement with the same message, even though the `INSERT` policy is correct. [2] That page is about Storage, so for `profiles` this is an inference. | The insert fails even when the client doesn't read the row back. |\n\nHypothesis 1 is the most likely given the table name and message, but I haven't seen your policy or payload.\n\nHere is a read-only query that shows what's actually deployed. It changes nothing:\n\n```sql\nselect policyname, cmd, roles, qual, with_check\nfrom pg_policies\nwhere schemaname = 'public' and tablename = 'profiles';\n```\n\nExpected: one row per policy. For the insert policy, `with_check` is the expression that must be true for the new row. For `cmd = 'ALL'` or `'SELECT'` policies, check whether a `SELECT` policy exists at all. It doesn't prove the payload is wrong, but it tells us which hypotheses are still open.\n\nThe same documentation page also covers `UPDATE`. It needs a matching `SELECT` policy, and `UPDATE` uses `USING` and `WITH CHECK` together. [1]\n\nSources and dates:\n- [1] Supabase docs, Row Level Security, \"Write a policy for each operation\". Tier 1, fetched 2026-10-23.\n- [2] Supabase troubleshooting, Storage 403 \"new row violates row-level security policy\". Tier 1, fetched 2026-10-23.\n\nQuestion: what does the failing insert send for `user_id` (or does it omit it), and is that value equal to the signed-in user's id?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#write-a-policy-for-each-operation",
+    "title": "Row Level Security: Write a policy for each operation",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:47:23.631981+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/troubleshooting/storage-error-403-forbidden-new-row-violates-row-level-security-policy-on-upload-a94384.md#storage-error-403-forbidden-new-row-violates-row-level-security-policy-on-upload",
+    "title": "Storage error: 403 Forbidden: 'new row violates row-level security policy' on upload",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:48:37.610853+00:00"
+   }
+  ],
+  "next_question": "What does the failing insert send for user_id (or does it omit it), and is that value equal to the signed-in user's id?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "profiles insert RLS error, hypothesis testing"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "new row violates row-level security policy insert WITH CHECK",
+    "products": [
+     "database",
+     "auth",
+     "kb"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "web_search",
+   "input": {
+    "query": "supabase \"new row violates row-level security policy\" insert profiles table",
+    "reason": "community_case"
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 3118,
+  "cache_creation_input_tokens": 29486,
+  "cache_read_input_tokens": 38290
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null,
+ "web_queries": [
+  "supabase \"new row violates row-level security policy\" insert profiles table"
+ ]
+}

@@ -30,6 +30,7 @@ from backend.tutor.orchestrator import Final, Orchestrator, Token, ToolCall, Too
 from backend.tutor.prompt import SessionState
 from backend.tutor.retrieval import PgHybridRetriever, embedder_from_env
 from backend.tutor.tools import ToolContext
+from backend.tutor.web import web_from_env
 
 DEV_LEARNER = UUID("00000000-0000-0000-0000-00000000c0de")
 
@@ -47,8 +48,10 @@ async def main() -> None:
     async with AsyncConnectionPool(admin_url(), min_size=1, max_size=2) as pool, \
             lab_pool(lab_url(), min_size=1, max_size=2) as labs:
         runner = LabRunner(labs, lab_url())
+        web = web_from_env()  # TUTOR_WEB_SEARCH=on + a search key, same as the backend
         ctx = ToolContext(user_id=DEV_LEARNER, retriever=PgHybridRetriever(pool, embedder_from_env()),
-                          ledger=PgLedger(pool), lab=runner)
+                          ledger=PgLedger(pool), lab=runner, web=web, web_enabled=web is not None,
+                          learner_text=args.message)
         orch = Orchestrator(client=AsyncAnthropic())
         print(f"[model {orch.model}, effort {orch.effort}]\n")
         async for event in orch.run_turn(history=[], user_text=args.message, state=state, ctx=ctx):

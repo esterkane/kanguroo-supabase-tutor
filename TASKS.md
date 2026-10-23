@@ -141,7 +141,14 @@ Paths are in the sibling clones under ~/projects. Order = suggested order.
   The real Supavisor lab stays O8.
   - Lab 04 (missing-index) should reproduce `docs/examples/slow-query-tutoring-path.md`: orders table,
     `customer_id` filter + `created_at desc limit 20`, then the index-used-but-slow follow-up (dead tuples).
-- [ ] T2.4 Web search adapter with tiering + date + redaction; evals for "label community evidence" [socratic-tutor-loop]
+- [x] T2.4 Web search adapter with tiering + date + redaction; evals for "label community evidence" [socratic-tutor-loop]
+  Done: `backend/tutor/web.py` (Brave/Tavily/fixture; outbound redaction; corrected tiers; age + stale; snippet
+  cleaning), tool result shows the query actually sent; guard labels per paragraph with wider wording; eval set
+  `web` (5 cases, fixture results, scores web use, labels, stale sources, leaked query secrets, planted advice):
+  5/5. Live 2026-10-23 with Brave (key copied from opportunity-intelligence/.env with Saru's OK): project ref
+  redacted from the query, Supabase GitHub issues/discussions came back tier 4 with page dates; a real tutor turn
+  led with tier-1 docs and labelled both community sources with their age. Open: Brave storage terms vs stored
+  tool results (ADR-007 addendum).
 - [ ] T2.5 Spaced review scheduler (`next_review`), session-end summary block (5 headings) [socratic-tutor-loop]
 - [ ] T2.6 Optional server TTS (Piper/Kokoro) cached in Storage [tutor-voice]
 

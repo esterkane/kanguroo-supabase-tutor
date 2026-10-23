@@ -62,6 +62,16 @@ Short form. Revisit when the "Revisit when" condition triggers.
 - **Decision:** `web_search` is only allowed for the categories in the master
   instructions ("CURRENT INFORMATION") or when `search_docs` returns no hit ≥ threshold.
   Every result carries `tier` and a date; the model must label community evidence.
+- **Addendum 2026-10-23 (T2.4):** `backend/tutor/web.py` adapts Saru's Brave/Tavily providers
+  (opportunity-intelligence). The query is redacted before it leaves the machine (keys, JWTs,
+  connection strings, e-mails, IPs, UUIDs, project refs, secrets pasted this turn) and the tool
+  result shows what was removed. Tiers follow the master instructions exactly: Supabase GitHub
+  issues/discussions and supabase.com/contribute are tier 4, upstream primary docs (PostgREST,
+  Deno, Docker) tier 3. Results older than ~18 months are `stale`; undated ones too for
+  version-sensitive reasons. The guard checks community labels per paragraph.
+  Open: Brave's terms allow storing results only on plans with storage rights, and the tutor
+  history stores tool results verbatim (needed for replay and caching). Decide between Tavily,
+  a Brave plan with storage rights, or trimming stored web results.
 
 ## ADR-008 Lab execution runs only in a disposable lab database
 

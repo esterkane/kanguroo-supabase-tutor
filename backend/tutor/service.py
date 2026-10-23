@@ -28,6 +28,7 @@ from backend.tutor.refresh import RefreshManager
 from backend.tutor.retrieval import PgHybridRetriever, Retriever, embedder_from_env
 from backend.tutor.schemas import TutorTurn
 from backend.tutor.voice import VoiceService
+from backend.tutor.web import BraveSearch, TavilySearch, web_from_env
 
 APP_MESSAGE = "[app message, not from the learner]"
 
@@ -160,6 +161,7 @@ class TutorService:
     anthropic: AsyncAnthropic | None
     refresh: RefreshManager | None = None
     voice: VoiceService | None = None  # server TTS (TUTOR_TTS=server); None: browser voices only
+    web: BraveSearch | TavilySearch | None = None  # web_search provider (TUTOR_WEB_SEARCH=on + key)
     store: TurnStore = field(init=False)
     runners: dict[UUID, LabRunner] = field(default_factory=dict)
     locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
@@ -180,6 +182,7 @@ class TutorService:
             anthropic=AsyncAnthropic() if has_llm else None,
             refresh=RefreshManager(app_pool, db_url, os.environ.get("TUTOR_REFRESH_TOKEN")),
             voice=VoiceService.from_env(),
+            web=web_from_env(),
         )
 
     async def open(self) -> None:
@@ -191,6 +194,8 @@ class TutorService:
             await self.refresh.close()
         if self.voice:
             await self.voice.close()
+        if self.web:
+            await self.web.client.aclose()
         for runner in self.runners.values():
             await runner.close_sessions()
         await self.lab_pool.close()

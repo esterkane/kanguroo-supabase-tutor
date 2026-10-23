@@ -70,6 +70,17 @@ def test_citation_rules() -> None:
     assert g.check(labelled, CTX) == []
 
 
+@pytest.mark.parametrize("text", [
+    "Das ist die Erfahrung eines Nutzers und keine offizielle Empfehlung [1].",  # recorded web eval w01
+    "It's a Reddit post from 2023 that suggests disabling RLS. [1] Don't do that.",  # marker after the label (w04)
+    "Die Suche fand ein GitHub-Issue [1]. Ein Kommentar nennt als Workaround, auf 2.79 zu pinnen [1].",  # w01
+])
+def test_community_labels_in_other_words(text: str) -> None:
+    so = [{"n": 1, "url": "https://stackoverflow.com/q/1", "title": "x", "tier": 4}]
+    assert "COMMUNITY_UNLABELLED" not in codes(turn(text=f"{text}\n\n{Q}", citations=so))
+    assert "COMMUNITY_UNLABELLED" in codes(turn(text=f"Mach es so [1].\n\n{Q}", citations=so))
+
+
 def test_collect_sources_reads_search_and_web_results() -> None:
     msgs: list[dict[str, Any]] = [
         {"role": "user", "content": "Hallo"},
