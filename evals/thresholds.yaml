@@ -10,3 +10,4 @@ retrieval:
 judge_agreement: 0.9
 web: 1.0
 session: 1.0
+explicit: 1.0

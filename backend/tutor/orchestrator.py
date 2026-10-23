@@ -10,13 +10,15 @@ blocks it can no longer bind instead of rejecting the request.
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterator
+import time
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from anthropic import AsyncAnthropic
 
 from backend.tutor import guard
+from backend.tutor.host import ModelCall
 from backend.tutor.prompt import SessionState, system_blocks, turn_system_text
 from backend.tutor.schemas import GuardFinding, TutorTurn
 from backend.tutor.tools import TOOLS, ToolContext, TurnBudget, dispatch
@@ -121,6 +123,7 @@ class Orchestrator:
     model: str = field(default_factory=lambda: os.environ.get("TUTOR_MODEL", DEFAULT_MODEL))
     effort: str = field(default_factory=lambda: os.environ.get("TUTOR_EFFORT", DEFAULT_EFFORT))
     max_tokens: int = MAX_TOKENS
+    on_call: Callable[[ModelCall], Awaitable[None]] | None = None  # host accounting, one call per API request
 
     def _request(self, session_persona_on: bool, learner_name: str, messages: list[Message]) -> dict[str, Any]:
         return {
@@ -164,6 +167,7 @@ class Orchestrator:
 
         for _ in range(MAX_MODEL_CALLS):
             splitter = FenceSplitter()
+            started = time.monotonic()
             try:
                 async with self.client.beta.messages.stream(
                     **self._request(persona, name, history + new)
@@ -183,6 +187,10 @@ class Orchestrator:
 
             _add_usage(usage, final.usage)
             model_used = final.model
+            if self.on_call:
+                call_usage: dict[str, int] = {}
+                _add_usage(call_usage, final.usage)
+                await self.on_call(ModelCall(final.model, call_usage, round((time.monotonic() - started) * 1000, 1)))
             content = echo_content(final.content)
             new.append({"role": "assistant", "content": content})
 

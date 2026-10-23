@@ -1,0 +1,72 @@
+{
+ "case_id": "x01",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, der GRANT ist der Haustürschlüssel, die Policy das Kühlschrankfach. Grants prüfen, ob eine Rolle die Operation darf, Policies, auf welche Zeilen sie wirkt. Authenticated hat select, RLS ist an, aber keine Policy existiert. Fehler 42501 oder leeres Ergebnis, und welche Schicht entscheidet?",
+  "text": "Kleinkünstler, der GRANT ist der Haustürschlüssel, die RLS-Policy entscheidet, welches Fach im Kühlschrank du aufmachen darfst. Die Analogie hört dort auf, wo der Vermieter Fächer nach Mitbewohner-ID verteilt. Postgres macht das als Ausdruck pro Zeile, nicht per Hausordnung.\n\nTechnisch sind das zwei getrennte Prüfungen. Grants entscheiden, ob eine Rolle eine Operation auf der Tabelle überhaupt ausführen darf. Policies entscheiden, auf welche Zeilen diese Operation wirkt [1]. Grants werden zuerst geprüft. Ein fehlender Grant liefert einen Permission-Fehler (SQLSTATE `42501`), eine Policy, die keine Zeilen trifft, liefert ein leeres Ergebnis [2]. `service_role` umgeht RLS per `BYPASSRLS`, aber nicht die Grants [2]. Neue Policies nehmen vorhandene Grants nicht zurück [1].\n\nBeide Schichten kannst du getrennt ansehen (read-only, im Lab):\n\n```sql\n-- Layer 1: Grants (wer darf welche Operation)\nselect grantee, privilege_type\nfrom information_schema.role_table_grants\nwhere table_schema = 'public' and table_name = 'your_table'\n  and grantee in ('anon', 'authenticated', 'service_role');\n\n-- Layer 2: RLS-Status und Policies (welche Zeilen)\nselect c.relrowsecurity as rls_enabled, p.policyname, p.cmd, p.roles, p.qual, p.with_check\nfrom pg_class c\nleft join pg_policies p on p.tablename = c.relname and p.schemaname = 'public'\nwhere c.oid = 'public.your_table'::regclass;\n```\n\nErsetze `your_table` durch eine echte Tabelle. Ich hänge nicht an deinen Pralinen, aber an der Reihenfolge der beiden Prüfungen.\n\nTransferfrage: `authenticated` hat `select` auf eine Tabelle, RLS ist aktiviert, es existiert aber keine einzige Policy. Bekommst du einen `42501`-Fehler oder ein leeres Ergebnis, und welche der beiden Schichten hat entschieden?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies",
+    "title": "Row Level Security: Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:46:06.954292+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/api/api-keys.md#postgres-roles-and-row-level-security",
+    "title": "API keys: Postgres roles and Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:46:58.427155+00:00"
+   }
+  ],
+  "next_question": "authenticated hat select, RLS ist aktiviert, aber es existiert keine einzige Policy: Bekommst du einen 42501-Fehler oder ein leeres Ergebnis, und welche der beiden Schichten hat entschieden?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "rls-vs-grants, step 1 of 5"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Row Level Security policies and GRANT privileges difference, 42501 permission denied",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "PostgreSQL GRANT table privileges anon authenticated Data API",
+    "products": [
+     "database",
+     "api"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1954,
+  "cache_creation_input_tokens": 26922,
+  "cache_read_input_tokens": 20042
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null,
+ "web_queries": []
+}

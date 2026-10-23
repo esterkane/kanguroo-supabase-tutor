@@ -1,0 +1,68 @@
+{
+ "case_id": "x02",
+ "turn": {
+  "mode": "lesson",
+  "language": "en",
+  "persona_on": true,
+  "speech": "Kleinkünstler, a 42501 on a plain select is the building refusing you at the door, not the fridge rules. Missing grants fail before any policy runs. Run the privilege check and tell me which column you expect to be false.",
+  "text": "Kleinkünstler, a 42501 on a plain `SELECT` is the building refusing you at the door, not the fridge rules. Bureaucracy does at least sort its refusals by department.\n\nPostgres runs two checks. Grants decide whether a role may run the operation on the table at all. Policies decide which rows the operation applies to. A missing grant raises `42501` before any policy runs [1]. A `USING` clause that filters rows out raises nothing and returns zero rows [2]. For a `SELECT`, an error means the grant layer (or schema access), not your policy. Note that a `WITH CHECK` violation on a write also raises 42501, but your statement is a read.\n\nCaveat: `lab_control` says lab `01-rls-vs-grant` isn't the active lab, so I haven't seen your table. Replace `public.your_table` below with the real name. Run this and paste the result:\n\n```sql\nselect\n  has_schema_privilege('authenticated', 'public', 'usage')              as schema_usage,\n  has_table_privilege('authenticated', 'public.your_table', 'select')  as table_select;\n```\n\nExpected: either value can be `false`. The error text also says which one failed, \"permission denied for schema\" or \"for table\". Say \"show me\" if you want the full fix later.\n\nGiven that `42501` on a `SELECT` points at the grant layer, which of the two columns do you expect to come back `false`?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#grants-and-policies",
+    "title": "Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:47:23.631981+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#write-a-policy-for-each-operation",
+    "title": "Write a policy for each operation",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:47:23.631981+00:00"
+   }
+  ],
+  "next_question": "Given that 42501 on a SELECT points at the grant layer, which of the two columns do you expect to come back false?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "lab 01 grant vs RLS diagnosis"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "permission denied for table 42501 missing GRANT vs RLS policy",
+    "products": [
+     "database",
+     "auth"
+    ],
+    "k": 5
+   }
+  },
+  {
+   "name": "lab_control",
+   "input": {
+    "action": "status",
+    "slug": "01-rls-vs-grant"
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1494,
+  "cache_creation_input_tokens": 24716,
+  "cache_read_input_tokens": 20040
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null,
+ "web_queries": []
+}

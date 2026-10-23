@@ -1,8 +1,8 @@
 import { useState } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AuthClient } from "./authClient";
 import type { Strings } from "../i18n";
 
-export function LoginForm({ supabase, s }: { supabase: SupabaseClient; s: Strings }) {
+export function LoginForm({ supabase, s }: { supabase: AuthClient; s: Strings }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);

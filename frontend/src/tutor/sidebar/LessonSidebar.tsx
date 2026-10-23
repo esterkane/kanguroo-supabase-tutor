@@ -13,6 +13,12 @@ export function LessonSidebar({ session, lastTurn, s, onCommand, busy }: {
         <dd>{session.objective ?? s.noObjective}</dd>
         <dt className="pt-1 uppercase tracking-wide text-zinc-500">{s.modes}</dt>
         <dd className="font-mono">{mode}{lastTurn && !lastTurn.persona_on ? " · neutral voice" : ""}</dd>
+        {session.delivery && (
+          <>
+            <dt className="pt-1 uppercase tracking-wide text-zinc-500">{s.delivery}</dt>
+            <dd>{session.delivery === "explicit" ? s.deliveryExplicit.replace(/ \(.*\)$/, "") : s.deliverySocratic}</dd>
+          </>
+        )}
         <dt className="pt-1 uppercase tracking-wide text-zinc-500">{s.path}</dt>
         <dd>
           {path?.state === "rabbit_hole" ? (

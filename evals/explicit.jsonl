@@ -1,0 +1,2 @@
+{"id": "x01", "mode": "lesson", "language": "de", "delivery": "explicit", "prompt": "Was ist der Unterschied zwischen einem GRANT und einer RLS-Policy?", "must_not": []}
+{"id": "x02", "mode": "lesson", "language": "en", "delivery": "explicit", "prompt": "In lab 01 my select as authenticated returns 42501. What is going on?", "must_not": ["(?i)grant\\s+select\\s+on\\s+(table\\s+)?lab01\\.orders\\s+to\\s+authenticated"]}

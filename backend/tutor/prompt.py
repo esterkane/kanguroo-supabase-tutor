@@ -29,6 +29,7 @@ CURRICULUM = Path(__file__).resolve().parents[2] / "docs" / "curriculum.yaml"
 SEP = "\n\n---\n\n"
 
 Mode = Literal["lesson", "incident", "exam", "neutral", "rabbit_hole"]
+Delivery = Literal["socratic", "explicit"]
 OnboardingStep = Literal["opening", "request_flow", "lab_handover"]
 ONBOARDING_LAB = "01-rls-vs-grant"
 
@@ -90,6 +91,7 @@ class SessionState:
     first_turn: bool = False
     onboarding: OnboardingStep | None = None
     incident: IncidentState | None = None
+    delivery: Delivery = "socratic"  # explicit: direct explanation + one check question (learner's choice)
     today: date = field(default_factory=date.today)
 
 
@@ -203,5 +205,6 @@ def system_blocks(persona_on: bool, learner_name: str = DEFAULT_LEARNER_NAME) ->
 
 
 def turn_system_text(state: SessionState) -> str:
-    """Mode + session state for one turn, sent as a mid-conversation system message."""
-    return mode_text(state.mode) + SEP + session_block(state)
+    """Mode (+ explicit delivery when chosen) + session state for one turn, as a mid-conversation system message."""
+    delivery = SEP + _read("delivery/explicit.md") if state.delivery == "explicit" else ""
+    return mode_text(state.mode) + delivery + SEP + session_block(state)

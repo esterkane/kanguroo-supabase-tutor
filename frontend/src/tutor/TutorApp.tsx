@@ -1,6 +1,6 @@
-import type { Session as AuthSession, SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ApiError, TutorApi } from "./api";
+import type { AuthClient, AuthSession } from "./auth/authClient";
 import { LoginForm } from "./auth/LoginForm";
 import { ChatPanel, type InputMode } from "./chat/ChatPanel";
 import { chatReducer, initialChat } from "./chatReducer";
@@ -14,11 +14,17 @@ import type { IncidentState, LedgerEntry, Session, TutorTurn } from "./types";
 import type { ServerTts } from "./voice/useSpeech";
 
 export interface TutorAppProps {
-  /** Supabase client of the host app (standalone: created in main.tsx). */
-  supabase: SupabaseClient;
-  /** Base path of the mounted FastAPI router, e.g. "/tutor". */
+  /** Standalone: the Supabase client (created in main.tsx); the learner signs in with it. */
+  supabase?: AuthClient;
+  /** Mounted in a host app (AuDHS ADR 0021): the host's backend vouches for this learner; no login, no token. */
+  host?: { userId: string };
+  /** Base path of the mounted FastAPI router, e.g. "/tutor" standalone or "/api/kaenguru" in AuDHS. */
   apiBase: string;
+  /** Ask "explicit or Socratic?" at the start of each session (default: on in host mode, explicit first). */
+  deliveryChoice?: boolean;
 }
+
+export type Delivery = "socratic" | "explicit";
 
 type Tab = "lesson" | "incident" | "lab" | "ledger";
 const lastSessionKey = (userId: string) => `kaenguru.session.${userId}`;
@@ -39,9 +45,34 @@ function writeLastSession(userId: string, sessionId: string) {
   }
 }
 
-export function TutorApp({ supabase, apiBase }: TutorAppProps) {
-  const [auth, setAuth] = useState<AuthSession | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+/** "How should the kangaroo explain today?" Explicit first: it is the default where a host asks (AuDHS rule). */
+function DeliveryChooser({ s, onChoose, onCancel }: {
+  s: ReturnType<typeof t>; onChoose: (d: Delivery) => void; onCancel?: () => void;
+}) {
+  const options: [Delivery, string, string][] = [
+    ["explicit", s.deliveryExplicit, s.deliveryExplicitHint], ["socratic", s.deliverySocratic, s.deliverySocraticHint],
+  ];
+  return (
+    <section aria-label={s.deliveryTitle} className="col-span-full mx-auto mt-16 w-full max-w-md space-y-3 px-4">
+      <h2 className="text-sm font-semibold">{s.deliveryTitle}</h2>
+      {options.map(([value, label, hint]) => (
+        <button key={value} type="button" onClick={() => onChoose(value)}
+                className="block w-full rounded border border-zinc-700 p-3 text-left hover:border-sky-600">
+          <span className="block text-sm">{label}</span>
+          <span className="block text-xs text-zinc-400">{hint}</span>
+        </button>
+      ))}
+      {onCancel && <button type="button" onClick={onCancel} className="text-xs text-zinc-500 hover:text-zinc-200">{s.cancel}</button>}
+    </section>
+  );
+}
+
+export function TutorApp({ supabase, host, apiBase, deliveryChoice = !!host }: TutorAppProps) {
+  const hostSession = useMemo<AuthSession | null>(() => (host ? { access_token: "", user: { id: host.userId } } : null),
+                                                   [host]);
+  const [auth, setAuth] = useState<AuthSession | null>(hostSession);
+  const [authReady, setAuthReady] = useState(!!host);
+  const [choosing, setChoosing] = useState(false);  // delivery choice shown before a new session starts
   const [session, setSession] = useState<Session | null>(null);
   const [chat, dispatch] = useReducer(chatReducer, initialChat);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
@@ -54,6 +85,7 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
   const authRef = useRef<AuthSession | null>(null);
 
   useEffect(() => {
+    if (!supabase) return;  // host mode: the identity comes from the host
     supabase.auth.getSession().then(({ data }) => {
       setAuth(data.session);
       setAuthReady(true);
@@ -64,6 +96,7 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
   authRef.current = auth;
 
   const api = useMemo(() => new TutorApi(apiBase, async () => {
+    if (!supabase) return null;  // host mode: the host backend authenticates the request
     const { data } = await supabase.auth.getSession();  // refreshes an expired access token
     return data.session?.access_token ?? authRef.current?.access_token ?? null;
   }), [apiBase, supabase]);
@@ -71,9 +104,10 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
   const userId = auth?.user.id;
   const s = t(session?.language ?? "de");
 
-  const startSession = useCallback(async () => {
+  const startSession = useCallback(async (delivery: Delivery = "socratic") => {
     if (!userId) return;
-    const created = await api.createSession({});
+    setChoosing(false);
+    const created = await api.createSession({ delivery });
     writeLastSession(userId, created.id);
     setSession(created);
     setIncident(null);
@@ -93,12 +127,14 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
           dispatch({ type: "load", rows: full.transcript });
         })
       : Promise.reject(new ApiError(404, "no session"))
-    ).catch((e) => (e instanceof ApiError && e.status === 404 ? startSession() : setFatal(String(e))));
+    ).catch((e) => (e instanceof ApiError && e.status === 404
+      ? (deliveryChoice ? setChoosing(true) : startSession())
+      : setFatal(String(e))));
     api.ledger().then((r) => setLedger(r.entries)).catch(() => undefined);
     api.voiceInfo().then((info) => setServerTts(info.tts === "server" ? {
       voices: info.voices, speechUrl: (turnId) => api.voiceSpeech(turnId).then((r) => r.url),
     } : null)).catch(() => setServerTts(null));  // browser voices only
-  }, [api, userId, startSession]);
+  }, [api, userId, startSession, deliveryChoice]);
 
   const send = useCallback(async (text: string, inputMode: InputMode = "text") => {
     if (!session) return;
@@ -139,7 +175,7 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
   }, [api, session]);
 
   if (!authReady) return null;
-  if (!auth) return <LoginForm supabase={supabase} s={s} />;
+  if (!auth) return supabase ? <LoginForm supabase={supabase} s={s} /> : null;
 
   const lastTurn: TutorTurn | null =
     [...chat.items].reverse().find((i) => i.kind === "tutor")?.turn ?? null;
@@ -151,13 +187,18 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
       <header className="col-span-full flex items-center gap-3 border-b border-zinc-800 px-3 py-2">
         <h1 className="font-semibold">{s.title}</h1>
         {session && <span className="truncate text-xs text-zinc-500">{session.objective ?? session.id.slice(0, 8)}</span>}
-        <button type="button" onClick={startSession} disabled={busy}
+        <button type="button" onClick={() => (deliveryChoice ? setChoosing(true) : startSession())} disabled={busy}
                 className="ml-auto rounded border border-zinc-700 px-2 py-0.5 text-xs hover:border-sky-600">{s.newSession}</button>
-        <button type="button" onClick={() => supabase.auth.signOut()}
-                className="rounded border border-zinc-700 px-2 py-0.5 text-xs hover:border-sky-600">{s.signOut}</button>
+        {supabase && (
+          <button type="button" onClick={() => supabase.auth.signOut()}
+                  className="rounded border border-zinc-700 px-2 py-0.5 text-xs hover:border-sky-600">{s.signOut}</button>
+        )}
       </header>
       {fatal && <p role="alert" className="col-span-full p-3 text-red-400">{fatal}</p>}
-      {session && (
+      {choosing && (
+        <DeliveryChooser s={s} onChoose={startSession} onCancel={session ? () => setChoosing(false) : undefined} />
+      )}
+      {session && !choosing && (
         <>
           <main className="flex min-h-0 flex-col border-r border-zinc-800">
             <ChatPanel chat={chat} s={s} language={session.language} onSend={send} serverTts={serverTts} />

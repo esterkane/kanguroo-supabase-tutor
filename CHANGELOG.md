@@ -115,3 +115,6 @@
   eval set `session` 2/2.
 - 2026-10-23 T2.6 English server voice: Piper en_US-ryan-high alongside Thorsten (default PIPER_VOICE_EN); the
   provider refuses voices Piper has not downloaded instead of getting German audio for English text.
+- 2026-10-23 T3.1 prerequisites (Känguru side of AuDHS ADR 0021 draft): `kaenguru_tutor` host API with host
+  identity and before_turn/on_model_call hooks, editable package layout, per-session explicit delivery, TutorApp
+  host mode + delivery chooser; eval set `explicit` 2/2. AuDHS itself unchanged.

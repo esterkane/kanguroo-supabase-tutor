@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TutorApp } from "./TutorApp";
 
@@ -145,6 +145,35 @@ test("incident: a customer problem as first message switches the session to inci
     fireEvent.click(screen.getByRole("button", { name: "Senden" }));
     await waitFor(() => expect(screen.getByRole("tab", { name: "Incident" }).getAttribute("aria-selected")).toBe("true"));
     expect(screen.getByText(/Noch kein Incident/)).toBeTruthy();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("host mode: no login, delivery choice first (explicit is the default), no token sent", async () => {
+  const seen: { url: string; auth?: string; body?: unknown }[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    seen.push({ url, auth: (init?.headers as Record<string, string>).Authorization,
+                body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (url === "/api/kaenguru/session") return json({ id: "h1", objective: null, mode: "lesson", language: "de",
+                                                       persona_on: true, delivery: "explicit", started_at: "now" }, 201);
+    if (url === "/api/kaenguru/ledger") return json({ entries: [] });
+    if (url === "/api/kaenguru/voice") return json({ tts: "browser", voices: {} });
+    return json({ detail: "unexpected" }, 500);
+  }));
+  try {
+    localStorage.clear();
+    render(<TutorApp host={{ userId: "owner" }} apiBase="/api/kaenguru" />);
+    const chooser = await screen.findByRole("region", { name: "Wie soll das Känguru in dieser Sitzung erklären?" });
+    const options = within(chooser).getAllByRole("button");
+    expect(options[0].textContent).toContain("Erklärend (Standard)");
+    expect(screen.queryByRole("button", { name: "Anmelden" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Abmelden" })).toBeNull();
+    fireEvent.click(options[0]);
+    await screen.findByRole("textbox", { name: /Antwort oder Frage/ });
+    expect(seen.find((r) => r.url === "/api/kaenguru/session")?.body).toEqual({ delivery: "explicit" });
+    expect(seen.every((r) => r.auth === undefined)).toBe(true);
+    expect(screen.getByText("Erklärend")).toBeTruthy();  // the lesson sidebar shows the session's delivery
   } finally {
     vi.unstubAllGlobals();
   }

@@ -103,13 +103,13 @@ check: ## lint + all tests (needs the stack running for pgTAP); evals: free retr
 
 evals-offline: env ## retrieval eval (local, enforced) + re-score recorded turns (report only); no API tokens
 	@$(WITH_ENV) $(PY) scripts/eval.py --sets retrieval --strict --if-ready | grep -E '^## |Thresholds'
-	@$(WITH_ENV) $(PY) scripts/eval.py --sets grounding socratic safety persona incident web session --replay --if-ready \
+	@$(WITH_ENV) $(PY) scripts/eval.py --sets grounding socratic safety persona incident web session explicit --replay --if-ready \
 	  | grep -E '^## '
 
 eval-calibrate: env ## judge agreement with labelled turns (reference path = pass); a few judge calls
 	$(WITH_ENV) { [ -f .env ] && set -a && . ./.env && set +a; true; } && $(PY) scripts/eval.py --calibrate
 
-evals: env ## full eval suite: 76 live tutor turns + judge, records them (uses API tokens, ~$2-5)
+evals: env ## full eval suite: 78 live tutor turns + judge, records them (uses API tokens, ~$2-5)
 	$(WITH_ENV) { [ -f .env ] && set -a && . ./.env && set +a; true; } && \
 	  $(PY) scripts/eval.py --all --record --judge --strict
 

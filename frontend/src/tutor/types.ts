@@ -73,6 +73,7 @@ export interface Session {
   language: Language;
   persona_on: boolean;
   started_at: string;
+  delivery?: "socratic" | "explicit";
   incident?: IncidentState | null;
 }
 

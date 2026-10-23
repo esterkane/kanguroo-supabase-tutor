@@ -165,13 +165,16 @@ Tables for comparisons. `EXPLAIN` output is shown both raw and as a tree.
 
 | Concern | Standalone | AuDHS Tutor sub-module |
 |---|---|---|
-| Backend | `uvicorn backend.main:app` | `app.include_router(tutor_router, prefix="/tutor")` |
-| Frontend | Vite app at `/` | React route `/tutor` sharing the shell and Tailwind theme |
-| Auth | Supabase Auth (local) | Reuse the host app's auth; tutor reads the user id from it |
+| Backend | `uvicorn backend.main:app` | `from kaenguru_tutor import build_service, router`; `include_router(router, prefix="/api/kaenguru")` |
+| Frontend | Vite app at `/` | `<TutorApp host={{ userId }} apiBase="/api/kaenguru" />` inside the host shell |
+| Auth | Supabase Auth (local), JWT per request | `HostVerifier`: the host vouches for its learner, mapped to one Supabase user; RLS still applies |
+| Accounting | — | Host hooks: `before_turn` may refuse (503), `on_model_call` gets every API call with usage |
+| Delivery | Socratic default | Per-session choice, explicit default (`deliveryChoice`) |
 | DB | Local Supabase project in this repo | Same local Supabase project, `tutor` schema |
 | Config | `.env` | Host app config + `TUTOR_*` keys |
 
-The code must not import anything from the host app; the host imports from the tutor.
+The code must not import anything from the host app; the host imports only from `kaenguru_tutor`
+(editable path dependency). AuDHS details and the open ADR: `docs/INTEGRATION-AUDHS.md`.
 
 ## 9. Security boundaries
 

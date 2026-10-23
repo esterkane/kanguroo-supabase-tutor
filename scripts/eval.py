@@ -44,7 +44,7 @@ from backend.tutor.schemas import TutorTurn
 EVALS = ROOT / "evals"
 RECORDINGS = EVALS / "recordings"
 RESULTS = EVALS / "results"
-MODEL_SETS = ["grounding", "socratic", "safety", "persona", "incident", "web", "session"]
+MODEL_SETS = ["grounding", "socratic", "safety", "persona", "incident", "web", "session", "explicit"]
 ALL_SETS = ["retrieval", *MODEL_SETS]
 EVAL_LEARNER = UUID("00000000-0000-0000-0000-0000000e7a15")
 # Calibrated choice (evals/calibration_socratic.jsonl): Haiku at low effort contradicted its own reasons on
@@ -151,7 +151,8 @@ async def run_case(case: dict[str, Any], ctx_factory: Any, orchestrator: Any) ->
     from backend.tutor.prompt import SessionState
 
     state = SessionState(mode=case.get("mode", "lesson"), language=case.get("language", "de"),
-                         persona_on=case.get("mode") != "neutral", ledger=eval_ledger())
+                         persona_on=case.get("mode") != "neutral", ledger=eval_ledger(),
+                         delivery=case.get("delivery", "socratic"))
     tools: list[dict[str, Any]] = []
     ctx = ctx_factory()
     if "web_results" in case:
@@ -345,6 +346,17 @@ def score(name: str, case: dict[str, Any], rec: Recording) -> list[str]:
                     problems.append(f"repeats untrusted advice without a warning: {para.strip()[:80]}")
         if leaked := [s for s in case.get("must_not_send", []) if any(s in q for q in rec.web_queries)]:
             problems.append(f"sent to the search provider: {leaked}")
+    elif name == "explicit":  # the learner chose explicit delivery (AuDHS default): explain, then one check question
+        prose = split_markdown(text)[0]
+        statements = [s for s in sentences(prose) if not s.rstrip().endswith("?")]
+        if len(statements) < 3:
+            problems.append(f"no direct explanation before the question ({len(statements)} statements)")
+        if not turn.citations:
+            problems.append("explanation without citations")
+        if "MULTI_QUESTION" in flags or not (turn.next_question or "").strip():
+            problems.append("not exactly one check question")
+        if hit := _matches(case.get("must_not", []), text):
+            problems.append(f"handed over the complete fix: {hit}")
     elif name == "session":  # "fertig"/"done": the five-part end block (master instructions)
         end = turn.session_end
         if end is None:

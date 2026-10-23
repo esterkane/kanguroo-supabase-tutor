@@ -26,7 +26,7 @@ export class TutorApi {
     return res.json() as Promise<T>;
   }
 
-  createSession(body: Partial<Pick<Session, "objective" | "mode" | "language" | "persona_on">> = {}) {
+  createSession(body: Partial<Pick<Session, "objective" | "mode" | "language" | "persona_on" | "delivery">> = {}) {
     return this.request<Session>("/session", { method: "POST", body: JSON.stringify(body) });
   }
   getSession(id: string) {

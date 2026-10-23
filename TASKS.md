@@ -164,5 +164,11 @@ Paths are in the sibling clones under ~/projects. Order = suggested order.
 ## Phase 3 — Sub-module and hosted
 
 - [ ] T3.1 Mount router + React route into AuDHS Tutor; shared auth
+  2026-10-23: option B (in-process) chosen; AuDHS ADR 0021 drafted in `docs/adr-drafts/` (Saru runs `/adr` in
+  AuDHS; Proposed until accepted). Känguru-side prerequisites done 2026-10-23: `kaenguru_tutor` host API
+  (`HostConfig`, `build_service`, `HostVerifier`, `HostHooks.before_turn/on_model_call`, `router`), editable
+  install verified from a clean venv with a stand-in host app; `session.delivery` socratic|explicit with
+  `prompts/delivery/explicit.md`; `TutorApp` host mode (no Supabase client/login/token, `AuthClient` type) and
+  delivery chooser (explicit first). Eval set `explicit` 2/2. Open: the AuDHS side, after ADR 0021 is accepted.
 - [ ] T3.2 Hosted target switch (read-only inspection of a Free project for Supavisor/Reports lessons)
 - [ ] T3.3 Case-study generator from redacted GitHub issues; exam mode

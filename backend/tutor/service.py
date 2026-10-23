@@ -19,6 +19,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from backend.tutor.auth import JwtVerifier
 from backend.tutor.db import as_user
+from backend.tutor.host import HostHooks, ModelCall, Verifier
 from backend.tutor.incident import IncidentState
 from backend.tutor.lab_runner import LabRunner, lab_pool
 from backend.tutor.ledger import LedgerStore, PgLedger
@@ -51,13 +52,13 @@ class TurnStore:
     pool: AsyncConnectionPool
 
     async def create_session(self, user_id: UUID, *, objective: str | None, mode: str, language: str,
-                             persona_on: bool) -> dict[str, Any]:
+                             persona_on: bool, delivery: str = "socratic") -> dict[str, Any]:
         async with as_user(self.pool, user_id) as conn:
             cur = conn.cursor(row_factory=dict_row)
             await cur.execute(
-                "insert into tutor.session (objective, mode, language, persona_on) values (%s, %s, %s, %s)"
-                " returning id, objective, mode, language, persona_on, started_at",
-                (objective, mode, language, persona_on))
+                "insert into tutor.session (objective, mode, language, persona_on, delivery)"
+                " values (%s, %s, %s, %s, %s) returning id, objective, mode, language, persona_on, delivery, started_at",
+                (objective, mode, language, persona_on, delivery))
             row = await cur.fetchone()
             assert row is not None
             return row
@@ -65,7 +66,7 @@ class TurnStore:
     async def session(self, user_id: UUID, session_id: UUID) -> dict[str, Any] | None:
         async with as_user(self.pool, user_id) as conn:
             cur = conn.cursor(row_factory=dict_row)
-            await cur.execute("select id, objective, mode, language, persona_on, started_at, ended_at, incident "
+            await cur.execute("select id, objective, mode, language, persona_on, delivery, started_at, ended_at, incident "
                               "from tutor.session where id = %s", (session_id,))
             return await cur.fetchone()
 
@@ -170,13 +171,14 @@ class TutorService:
     app_pool: AsyncConnectionPool
     lab_pool: AsyncConnectionPool
     lab_url: str
-    verifier: JwtVerifier
+    verifier: Verifier  # JwtVerifier standalone, HostVerifier when mounted in a host
     retriever: Retriever
     ledger: LedgerStore
     anthropic: AsyncAnthropic | None
     refresh: RefreshManager | None = None
     voice: VoiceService | None = None  # server TTS (TUTOR_TTS=server); None: browser voices only
     web: BraveSearch | TavilySearch | None = None  # web_search provider (TUTOR_WEB_SEARCH=on + key)
+    hooks: HostHooks | None = None  # host app: may refuse a turn, receives every model call
     store: TurnStore = field(init=False)
     runners: dict[UUID, LabRunner] = field(default_factory=dict)
     locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
@@ -226,9 +228,15 @@ class TutorService:
     def lock(self, session_id: UUID) -> asyncio.Lock:
         return self.locks.setdefault(session_id, asyncio.Lock())
 
-    def orchestrator(self) -> Orchestrator:
+    def orchestrator(self, user_id: UUID | None = None) -> Orchestrator:
         assert self.anthropic is not None
-        return Orchestrator(client=self.anthropic)
+        hooks = self.hooks
+        if hooks is None or user_id is None:
+            return Orchestrator(client=self.anthropic)
+
+        async def report(call: ModelCall) -> None:
+            await hooks.on_model_call(user_id, call)
+        return Orchestrator(client=self.anthropic, on_call=report)
 
     async def session_state(self, user_id: UUID, session: dict[str, Any], history: list[Message]) -> SessionState:
         ledger = await self.ledger.read(user_id)
@@ -239,6 +247,7 @@ class TutorService:
         last = await self.store.last_summary(user_id, session["id"]) or {}
         return SessionState(
             mode=session["mode"], language=session["language"], persona_on=session["persona_on"],
+            delivery=session.get("delivery", "socratic"),
             objective=session["objective"], ledger=ledger,
             active_lab=ActiveLab(lab.spec.slug, lab.spec.title, lab.hints_used) if lab else None,
             first_turn=not history and not ledger and not incident_mode,

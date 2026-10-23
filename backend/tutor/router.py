@@ -30,6 +30,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sse_starlette import EventSourceResponse
 
+from backend.tutor.host import HostRefusal
 from backend.tutor.incident import (
     IncidentState,
     ScalarField,
@@ -66,6 +67,7 @@ class NewSession(BaseModel):
     mode: Literal["lesson", "incident", "exam", "neutral", "rabbit_hole"] = "lesson"
     language: Literal["de", "en"] = "de"
     persona_on: bool = True
+    delivery: Literal["socratic", "explicit"] = "socratic"  # hosts like AuDHS default to explicit
 
 
 class TurnRequest(BaseModel):
@@ -193,6 +195,11 @@ async def turn(body: TurnRequest, svc: Svc, user: User) -> EventSourceResponse:
     lock = svc.lock(body.session_id)
     if lock.locked():
         raise HTTPException(status.HTTP_409_CONFLICT, "a turn is already running for this session")
+    if svc.hooks:  # the host may refuse, e.g. when its daily hosted budget is spent
+        try:
+            await svc.hooks.before_turn(user)
+        except HostRefusal as e:
+            raise HTTPException(e.status_code, e.message) from e
 
     async def events() -> AsyncIterator[dict[str, str]]:
         async with lock:
@@ -208,7 +215,7 @@ async def turn(body: TurnRequest, svc: Svc, user: User) -> EventSourceResponse:
                               web_enabled=svc.web is not None, learner_text=body.text)
             before = runner.active.lab_run_id if runner.active else None  # detects lab_control installs
             try:
-                async for event in svc.orchestrator().run_turn(history=history, user_text=body.text, state=state,
+                async for event in svc.orchestrator(user).run_turn(history=history, user_text=body.text, state=state,
                                                                ctx=ctx):
                     if isinstance(event, Token):
                         yield _sse("token", {"text": event.text})
