@@ -9,3 +9,4 @@ retrieval:
   mrr: 0.6
 judge_agreement: 0.9
 web: 1.0
+session: 1.0

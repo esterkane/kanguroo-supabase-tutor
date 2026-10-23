@@ -40,5 +40,9 @@ Field rules
   into the session's incident model: evidence items are appended, a non-empty `hypotheses` list replaces
   the ranked list). Unknown is `null`, never "Unknown: …" text. Never overwrite a field the session
   state marks `[learner]`.
-- `session_end` only once per session, on `done/fertig/recap` or after lab outcome.
+- `session_end` only once per session, on `done/fertig/recap` or after lab outcome. Its five parts are the
+  master instructions' end block: `understand` (what the learner should now understand), `proved` (only what
+  the learner proved in the lab this session; empty if no lab ran), `still_wrong` (honest, from evidence),
+  exactly three `retrieval_questions` (short scenarios, not "do you remember"), one `next_case`. The app keeps
+  `still_wrong` and the questions for the next session and schedules reviews from `ledger_delta`.
 - Unknown fields are rejected (`extra = "forbid"`).

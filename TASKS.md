@@ -96,7 +96,7 @@ Paths are in the sibling clones under ~/projects. Order = suggested order.
   the orchestrator already sums cache read/write tokens in `Final.usage`.
 - [ ] R6 Recorded LLM replies for offline evals: `opportunity-intelligence/src/oi/providers/llm.py` (`FixtureProvider`).
 - [ ] R7 Judge calibration for socratic/grounding evals: `lernapp/evals/calibration.py`.
-- [ ] R8 T2.5 spaced review with FSRS (py-fsrs) as in `audhs-tutor/backend/app/kernel/memory.py` instead of SM-2.
+- [x] R8 T2.5 spaced review with FSRS (py-fsrs) as in `audhs-tutor/backend/app/kernel/memory.py` instead of SM-2.
 - [ ] R9 T2.6 server TTS via the running Kokoro container (`audhs-tutor/backend/app/voice/tts.py`, sentence
   streaming in `voice/loop.py`) — English only: Kokoro v1 has no German voices, German stays on Web Speech/Piper.
 - [x] R11 German server TTS via Piper (e.g. de_DE thorsten-high), same /tutor/voice endpoint as R9, cached by speech
@@ -149,7 +149,13 @@ Paths are in the sibling clones under ~/projects. Order = suggested order.
   redacted from the query, Supabase GitHub issues/discussions came back tier 4 with page dates; a real tutor turn
   led with tier-1 docs and labelled both community sources with their age. Open: Brave storage terms vs stored
   tool results (ADR-007 addendum).
-- [ ] T2.5 Spaced review scheduler (`next_review`), session-end summary block (5 headings) [socratic-tutor-loop]
+- [x] T2.5 Spaced review scheduler (`next_review`), session-end summary block (5 headings) [socratic-tutor-loop]
+  Done: `backend/tutor/review.py` (py-fsrs, retention 0.9, no minute-long learning steps for topics: Good streak
+  2 → 11 → 46 days); every ledger delta is one review (score → rating), card in `mastery_ledger.fsrs_card`; up to
+  three due topics go into the session state (one retrieval question in lesson mode, never during an incident).
+  `session_end` is stored in `session.summary` (+ ended_at); the next session gets still_wrong and the three
+  retrieval questions; guard: exactly three questions + a next case. UI: summary card with the five headings,
+  due badges in the ledger, "fertig" command. Eval set `session` (2 live cases) 2/2.
 - [ ] T2.6 Optional server TTS (Piper/Kokoro) cached in Storage [tutor-voice]
 
 ## Phase 3 — Sub-module and hosted

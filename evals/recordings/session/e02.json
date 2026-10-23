@@ -1,0 +1,92 @@
+{
+ "case_id": "e02",
+ "turn": {
+  "mode": "lesson",
+  "language": "en",
+  "persona_on": true,
+  "speech": "Kleinkünstler, the key was missing, not the fridge rule. 42501 is the grant layer, an empty result is RLS. I couldn't verify your PASS because lab 01 isn't active, so I take it as your report. Next case: insert fails with grants correct.",
+  "text": "Kleinkünstler, \"done\" accepted. The Haustürschlüssel (the GRANT) turned out to be the missing piece. The Kühlschrankfach rules (RLS) were fine all along. The analogy stops at one point: in Postgres, the missing key is refused with an error, not with an empty fridge.\n\n**One correction on my side.** I tried `lab_control check` for `01-rls-vs-grant`. The app answered that lab 01 is not the active lab, so I could not confirm your PASS. I'm taking it as your report, not as something I observed. Reinstall the lab if you want me to verify it. Your own evidence is solid anyway.\n\nYour diagnosis matches the docs. A missing grant raises `42501` before any policy runs, so when a request that a policy should allow fails, check the grants first [1].\n\n**WHAT I SHOULD NOW UNDERSTAND**\n- `42501` means a missing privilege at the grant layer. An empty result means the grant passed and RLS filtered the rows.\n- Your 10 rows after the grant show the two controls working in sequence.\n\n**WHAT I PROVED IN THE LAB** (from your report; I could not re-verify it)\n- `has_table_privilege(...)` returned false, so you located the failing layer with a query.\n- After `grant select`, you got only your own 10 rows.\n\n**WHAT I STILL GOT WRONG**\n- You didn't state a hypothesis or a prediction before running the check. The order is evidence, hypothesis, test, interpretation.\n- You didn't say why you got 10 rows and not all of them. Name the policy expression that did the filtering.\n- Docs say new `public` tables on existing projects may carry broad default grants, so verify that your grant is minimal [1].\n\n**THREE RETRIEVAL QUESTIONS**\n1. A signed-out visitor calls the API and gets `42501` on a table that has a policy `to anon using (true)`. Name the layer and the check you run first.\n2. A signed-in user gets `200` with `[]` on a table they should see. Name two things you inspect before touching the policy.\n3. A table has RLS enabled and `anon` still holds every grant. Explain what an `insert` does and why that matters.\n\n**NEXT CASE:** an `insert` fails for `authenticated` with a different message than `42501`, even though the grants are correct. Think about which clause could reject it.",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#grants-and-policies",
+    "title": "Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:47:23.631981+00:00"
+   }
+  ],
+  "next_question": null,
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "request flow lesson, grants and RLS"
+  },
+  "ledger_delta": [
+   {
+    "topic": "rls-vs-grants",
+    "score": 3,
+    "evidence": "Learner reported has_table_privilege false, granted select, then saw only own 10 rows; lab check could not be verified because lab 01 was not active."
+   },
+   {
+    "topic": "sqlstate-42501",
+    "score": 3,
+    "evidence": "Learner located the failing layer with has_table_privilege after a 42501 on lab01.orders (self-reported)."
+   }
+  ],
+  "lab_action": null,
+  "incident": null,
+  "session_end": {
+   "understand": [
+    "42501 means a missing privilege at the grant layer, raised before any policy runs.",
+    "An empty result means the grant passed and RLS filtered the rows."
+   ],
+   "proved": [
+    "has_table_privilege('authenticated','lab01.orders','select') returned false (self-reported).",
+    "After the select grant, the learner saw only their own 10 rows (self-reported; lab check not verifiable, lab 01 not active)."
+   ],
+   "still_wrong": [
+    "No hypothesis or prediction was stated before testing.",
+    "Did not explain which policy expression produced the 10-row filter.",
+    "Did not check that the grant is minimal given possible broad default grants."
+   ],
+   "retrieval_questions": [
+    "A signed-out visitor gets 42501 on a table with a policy 'to anon using (true)'. Which layer failed and what do you check first?",
+    "A signed-in user gets 200 with an empty array on a table they should see. Name two things you inspect before changing the policy.",
+    "A table has RLS enabled but anon still holds every grant. What does an insert do and why does it matter?"
+   ],
+   "next_case": "An insert fails for authenticated with an error other than 42501 even though the grants are correct; reason about WITH CHECK."
+  },
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "lab_control",
+   "input": {
+    "action": "check",
+    "slug": "01-rls-vs-grant"
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "permission denied 42501 table grants vs row level security policies authenticated role",
+    "products": [
+     "database",
+     "auth"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2893,
+  "cache_creation_input_tokens": 23391,
+  "cache_read_input_tokens": 19890
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null,
+ "web_queries": []
+}

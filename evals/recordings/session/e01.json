@@ -1,0 +1,95 @@
+{
+ "case_id": "e01",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, deine Antwort stimmt: Mit GRANT und ohne Policy gibt es null Zeilen und keinen Fehler. 42501 kommt bei fehlendem Privileg, aber auch bei einem with check Verstoß. Schönen Feierabend.",
+  "text": "Fertig, Kleinkünstler. Deine letzte Antwort stimmt: Mit GRANT, aber ohne Policy bekommst du keine Fehlermeldung. Das Ergebnis ist leer, wenn RLS auf der Tabelle aktiv ist. Die Supabase-Doku sagt, dass bei aktivem RLS über die API keine Daten zugänglich sind, bis du Policies anlegst [1]. Ein fehlendes Privileg löst dagegen `42501` aus, bevor irgendeine Policy läuft [2]. Das Ganze ist Bürokratie mit sauberer Zuständigkeitsverteilung, ungewohnt für diese Branche.\n\nZwei Dinge musst du dir merken:\n- Ein `using`-Filter erzeugt keinen Fehler. Er liefert null passende Zeilen.\n- Ein `with check`-Verstoß liefert dagegen `42501`, obwohl das Privileg vorhanden ist [3]. Du darfst `42501` also nicht automatisch mit einem fehlenden GRANT gleichsetzen. Für den SELECT aus deiner Eingangsfrage bleibt der GRANT trotzdem der erste Verdacht.\n\nIch habe in dieser Sitzung keine Lab-Abfrage ausgeführt. Deine Vorhersage ist daher belegt durch die Doku, nicht durch einen Lab-Lauf.\n\n**WAS DU JETZT VERSTEHEN SOLLTEST**\n- 42501 bei SELECT zeigt auf ein fehlendes Tabellenprivileg.\n- Fehlende SELECT-Policy bei aktivem RLS ergibt 0 Zeilen ohne Fehler.\n- Bei Schreibzugriffen kann `42501` auch von `with check` kommen.\n\n**WAS DU IM LAB BEWIESEN HAST**\n- Nichts. Es lief kein Lab.\n\n**WAS DU NOCH FALSCH HATTEST**\n- Du hast 42501 zuerst der fehlenden Policy zugeordnet. Das ist die Verwechslung der beiden Ebenen.\n\n**DREI WIEDERHOLUNGSFRAGEN**\n1. Ein INSERT als `authenticated` scheitert mit 42501, obwohl `grant insert` existiert. Nenne die wahrscheinlichste Ursache.\n2. Ein UPDATE meldet \"0 rows affected\" und keinen Fehler. Nenne die Ebene und die Klausel.\n3. Nenne zwei Dinge, die du prüfst, bevor du eine Policy änderst, wenn eine Anfrage scheitert, die die Policy erlauben sollte.\n\n**EIN SUPPORT-FALL ZUM WEITERDENKEN**\nEin Kunde meldet \"RLS ist kaputt: Die Liste ist leer, aber die Daten sind da\". Überlege, welche drei Belege du zuerst anforderst.\n\n[1] https://supabase.com/docs/guides/database/postgres/row-level-security.md#enable-rls-and-set-the-grants\n[2] https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies\n[3] https://supabase.com/docs/guides/database/postgres/row-level-security.md#write-a-policy-for-each-operation",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#enable-rls-and-set-the-grants",
+    "title": "Enable RLS and set the grants",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:46:06.954292+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies",
+    "title": "Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:46:06.954292+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#write-a-policy-for-each-operation",
+    "title": "Write a policy for each operation",
+    "tier": 1,
+    "fetched_at": "2026-10-23T11:46:06.954292+00:00"
+   }
+  ],
+  "next_question": null,
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "rls-vs-grants, naechste Sitzung"
+  },
+  "ledger_delta": [
+   {
+    "topic": "sqlstate-42501",
+    "score": 2,
+    "evidence": "Ordnete 42501 zuerst der fehlenden Policy zu, nach Korrektur sagte er korrekt 0 Zeilen ohne Fehler voraus; kein Lab-Lauf."
+   },
+   {
+    "topic": "policy-select",
+    "score": 2,
+    "evidence": "Sagte korrekt voraus, dass GRANT ohne SELECT-Policy bei aktivem RLS 0 Zeilen ohne Fehler liefert; nur durch Doku belegt."
+   }
+  ],
+  "lab_action": null,
+  "incident": null,
+  "session_end": {
+   "understand": [
+    "42501 bei SELECT zeigt auf ein fehlendes Tabellenprivileg, das vor jeder Policy geprueft wird.",
+    "Fehlende SELECT-Policy bei aktivem RLS liefert 0 Zeilen ohne Fehler.",
+    "Ein with check Verstoss liefert 42501 trotz vorhandenem Privileg."
+   ],
+   "proved": [],
+   "still_wrong": [
+    "Ordnete 42501 zuerst der fehlenden Policy zu und verwechselte damit Grant- und Policy-Ebene."
+   ],
+   "retrieval_questions": [
+    "Ein INSERT als authenticated scheitert mit 42501, obwohl grant insert existiert. Was ist die wahrscheinlichste Ursache?",
+    "Ein UPDATE meldet 0 rows affected ohne Fehler. Welche Ebene und welche Klausel sind verantwortlich?",
+    "Eine Anfrage scheitert, die die Policy erlauben sollte. Welche zwei Dinge prueft man, bevor man die Policy aendert?"
+   ],
+   "next_case": "Ein Kunde meldet, RLS sei kaputt, weil die Liste leer ist, obwohl die Daten vorhanden sind. Welche drei Belege fordert man zuerst an?"
+  },
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "RLS enabled no policy returns zero rows; permission denied for table 42501 missing grant",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 5
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 3056,
+  "cache_creation_input_tokens": 25045,
+  "cache_read_input_tokens": 19998
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null,
+ "web_queries": []
+}

@@ -53,6 +53,7 @@ erDiagram
     text language "de|en"
     timestamptz started_at
     jsonb incident "IncidentState, merged per turn (T2.2)"
+    jsonb summary "SessionEnd block, T2.5"
   }
   turn {
     uuid id PK

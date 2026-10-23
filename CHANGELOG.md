@@ -110,3 +110,6 @@
 - 2026-10-23 T2.4 web search adapter: Brave/Tavily providers, query redaction before sending, tiers per the
   master instructions (Supabase GitHub issues = community), age/stale labels, snippet cleaning; guard checks
   community labels per paragraph; eval set `web` 5/5 with fixture results.
+- 2026-10-23 T2.5 spaced review with FSRS (py-fsrs, per ledger topic, due topics in the session state) and the
+  session-end block (stored, carried into the next session, five-heading card, guard: three retrieval questions);
+  eval set `session` 2/2.

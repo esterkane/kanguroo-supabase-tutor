@@ -335,3 +335,27 @@ async def test_first_message_with_a_customer_problem_skips_onboarding(api: Any, 
     # The model may leave incident mode later; onboarding still does not come back in this session.
     await client.post("/tutor/turn", json={"session_id": sid, "text": "Ok"}, headers=auth(a))
     assert await svc.store.onboarding_step(a, UUID(sid)) is None
+
+
+async def test_session_end_is_stored_and_carried_into_the_next_session(api: Any, users: tuple[UUID, UUID]) -> None:
+    client, svc, fake = api
+    a, _ = users
+    first = (await client.post("/tutor/session", json={}, headers=auth(a))).json()["id"]
+    end = {"understand": ["GRANT is checked before RLS"], "proved": [], "still_wrong": ["policy vs grant order"],
+           "retrieval_questions": ["Which SQLSTATE comes from a missing grant?", "What does RLS do to a SELECT?",
+                                   "Where do you see the role PostgREST switched to?"],
+           "next_case": "An insert works for anon but not for authenticated."}
+    fake.script += [text_reply("Gut, Schluss für heute.", turn={"mode": "lesson", "language": "de",
+                                                               "persona_on": True, "speech": "Schluss für heute.",
+                                                               "session_end": end}),
+                    text_reply("Weiter.")]
+    await client.post("/tutor/turn", json={"session_id": first, "text": "fertig"}, headers=auth(a))
+    async with svc.store.pool.connection() as conn:
+        cur = await conn.execute("select summary, ended_at is not null from tutor.session where id = %s", (first,))
+        summary, ended = await cur.fetchone() or (None, False)
+    assert ended and summary is not None and summary["next_case"] == end["next_case"]
+
+    second = (await client.post("/tutor/session", json={}, headers=auth(a))).json()["id"]
+    await client.post("/tutor/turn", json={"session_id": second, "text": "Hallo"}, headers=auth(a))
+    system = [m["content"] for m in fake.requests[-1]["messages"] if m["role"] == "system"][-1]
+    assert "- policy vs grant order" in system and "- Which SQLSTATE comes from a missing grant?" in system

@@ -85,6 +85,8 @@ class SessionState:
     ledger: Sequence[LedgerEntry] = ()
     active_lab: ActiveLab | None = None
     still_wrong: Sequence[str] = ()
+    retrieval_questions: Sequence[str] = ()  # from the last session's summary
+    due: Sequence[LedgerEntry] = ()  # FSRS: topics whose review is due, most overdue first
     first_turn: bool = False
     onboarding: OnboardingStep | None = None
     incident: IncidentState | None = None
@@ -177,9 +179,19 @@ def session_block(state: SessionState) -> str:
     else:
         lines += ["", "Mastery ledger: empty — assess with a scenario, not a self-rating."]
 
+    if state.due:
+        lines += ["", "Due for spaced review (FSRS, most overdue first):"]
+        lines += [f"- {e.topic} {e.score}/5, due since {e.next_review.date().isoformat() if e.next_review else '?'}"
+                  for e in state.due]
+        lines.append("In lesson mode, at the start of a session or at a natural pause, ask ONE retrieval question on "
+                     "the first due topic as a short new scenario (not a self-rating) and record the result in "
+                     "ledger_delta. Not in incident mode and not in the middle of a lab step.")
     if state.still_wrong:
         lines += ["", "Still wrong at the end of the last session:"]
         lines += [f"- {_clip(item)}" for item in state.still_wrong]
+    if state.retrieval_questions:
+        lines += ["", "Retrieval questions left at the end of the last session (use one when it fits):"]
+        lines += [f"- {_clip(q)}" for q in state.retrieval_questions]
     if state.incident or state.mode == "incident":
         lines.append(prompt_block(state.incident or IncidentState()))
     return "\n".join(lines)

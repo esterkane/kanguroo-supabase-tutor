@@ -39,6 +39,15 @@ const strings = {
     ledger: "Lernstand",
     ledgerEmpty: "Noch keine Einträge",
     reviewNow: "wiederholen",
+    due: "fällig",
+    nextReview: "nächste Wiederholung",
+    sessionEnd: "Sitzungsende",
+    endUnderstand: "Was du jetzt verstehen solltest",
+    endProved: "Was du im Lab bewiesen hast",
+    endStillWrong: "Was noch nicht stimmt",
+    endRetrieval: "Drei Abruffragen",
+    endNextCase: "Ein Support-Fall zum Nachdenken",
+    nothingYet: "nichts",
     labs: "Labs",
     install: "installieren",
     status: "Status",
@@ -116,6 +125,15 @@ const strings = {
     ledger: "Mastery ledger",
     ledgerEmpty: "No entries yet",
     reviewNow: "review",
+    due: "due",
+    nextReview: "next review",
+    sessionEnd: "End of session",
+    endUnderstand: "What you should now understand",
+    endProved: "What you proved in the lab",
+    endStillWrong: "What you still got wrong",
+    endRetrieval: "Three retrieval questions",
+    endNextCase: "One support case to think about next",
+    nothingYet: "nothing",
     labs: "Labs",
     install: "install",
     status: "status",
@@ -163,7 +181,7 @@ export const t = (lang: Language): Strings => strings[lang];
 
 // The literal commands the tutor understands (prompts/tutor_runtime.md "Mode switches").
 export const MODE_COMMANDS = [
-  "incident", "hint", "show me", "skip", "neutral", "rabbit hole", "recap", "exam", "slower", "faster", "ohne Känguru",
+  "incident", "hint", "fertig", "show me", "skip", "neutral", "rabbit hole", "recap", "exam", "slower", "faster", "ohne Känguru",
 ] as const;
 
 // Incident model headings (prompts/kaenguru_master_instructions.md SUPPORT ENGINEERING MODE).

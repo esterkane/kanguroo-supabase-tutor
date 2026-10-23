@@ -90,6 +90,7 @@ export interface LedgerEntry {
   score: number;
   evidence: string | null;
   last_reviewed: string;
+  next_review?: string | null;  // FSRS due date (backend/tutor/review.py)
 }
 
 export interface LabInfo {

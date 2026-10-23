@@ -26,6 +26,7 @@ from backend.tutor.orchestrator import Message, Orchestrator, reply_text
 from backend.tutor.prompt import ONBOARDING_LAB, ActiveLab, OnboardingStep, SessionState
 from backend.tutor.refresh import RefreshManager
 from backend.tutor.retrieval import PgHybridRetriever, Retriever, embedder_from_env
+from backend.tutor.review import due_topics
 from backend.tutor.schemas import TutorTurn
 from backend.tutor.voice import VoiceService
 from backend.tutor.web import BraveSearch, TavilySearch, web_from_env
@@ -67,6 +68,20 @@ class TurnStore:
             await cur.execute("select id, objective, mode, language, persona_on, started_at, ended_at, incident "
                               "from tutor.session where id = %s", (session_id,))
             return await cur.fetchone()
+
+    async def end_session(self, user_id: UUID, session_id: UUID, summary: dict[str, Any]) -> None:
+        """Store the session-end block; a later `recap` in the same session replaces it."""
+        async with as_user(self.pool, user_id) as conn:
+            await conn.execute("update tutor.session set summary = %s::jsonb, ended_at = now() where id = %s",
+                               (json.dumps(summary), session_id))
+
+    async def last_summary(self, user_id: UUID, current: UUID) -> dict[str, Any] | None:
+        """The summary of the learner's most recently ended other session."""
+        async with as_user(self.pool, user_id) as conn:
+            cur = await conn.execute("select summary from tutor.session where summary is not null and id <> %s "
+                                     "order by ended_at desc limit 1", (current,))
+            row = await cur.fetchone()
+        return row[0] if row else None
 
     async def set_mode(self, user_id: UUID, session_id: UUID, mode: str) -> None:
         async with as_user(self.pool, user_id) as conn:
@@ -221,6 +236,7 @@ class TutorService:
         lab = runner.active if runner else None
         incident_mode = session["mode"] == "incident"
         onboarding = None if incident_mode else await self.store.onboarding_step(user_id, session["id"])
+        last = await self.store.last_summary(user_id, session["id"]) or {}
         return SessionState(
             mode=session["mode"], language=session["language"], persona_on=session["persona_on"],
             objective=session["objective"], ledger=ledger,
@@ -228,4 +244,7 @@ class TutorService:
             first_turn=not history and not ledger and not incident_mode,
             onboarding=onboarding,
             incident=IncidentState.model_validate(session["incident"]) if session.get("incident") else None,
+            due=due_topics(ledger),
+            still_wrong=tuple(last.get("still_wrong", [])),
+            retrieval_questions=tuple(last.get("retrieval_questions", [])),
         )

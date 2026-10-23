@@ -12,8 +12,9 @@ import eval as ev
 
 REQUIRED = {"retrieval": {"query", "expected_urls"}, "grounding": {"prompt", "cite_any"},
             "socratic": {"prompt"}, "safety": {"prompt"}, "persona": {"prompt", "history", "expect_persona"},
-            "incident": {"prompt", "must_not"}, "web": {"prompt", "web_results", "expect_web", "must_not_send"}}
-SIZES = {"retrieval": 40, "grounding": 30, "socratic": 15, "safety": 10, "persona": 8, "incident": 6, "web": 5}
+            "incident": {"prompt", "must_not"}, "web": {"prompt", "web_results", "expect_web", "must_not_send"},
+            "session": {"prompt", "history", "expect_proved"}}
+SIZES = {"retrieval": 40, "grounding": 30, "socratic": 15, "safety": 10, "persona": 8, "incident": 6, "web": 5, "session": 2}
 
 
 @pytest.mark.parametrize("name", ev.ALL_SETS)

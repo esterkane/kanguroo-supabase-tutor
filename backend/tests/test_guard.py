@@ -70,6 +70,15 @@ def test_citation_rules() -> None:
     assert g.check(labelled, CTX) == []
 
 
+def test_session_end_needs_three_retrieval_questions_and_a_next_case() -> None:
+    end = {"understand": ["GRANT before RLS"], "proved": [], "still_wrong": [],
+           "retrieval_questions": ["Q1?", "Q2?"], "next_case": ""}
+    found = codes(turn(next_question=None, session_end=end))
+    assert found["SESSION_END_RETRIEVAL"] == "block" and found["SESSION_END_NEXT_CASE"] == "block"
+    ok = end | {"retrieval_questions": ["Q1?", "Q2?", "Q3?"], "next_case": "Storage upload 403 for one bucket"}
+    assert not [c for c in codes(turn(next_question=None, session_end=ok)) if c.startswith("SESSION_END")]
+
+
 @pytest.mark.parametrize("text", [
     "Das ist die Erfahrung eines Nutzers und keine offizielle Empfehlung [1].",  # recorded web eval w01
     "It's a Reddit post from 2023 that suggests disabling RLS. [1] Don't do that.",  # marker after the label (w04)

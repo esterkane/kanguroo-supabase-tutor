@@ -321,6 +321,24 @@ def check_incident(turn: TutorTurn, ctx: GuardContext) -> list[GuardFinding]:
     return findings
 
 
+def check_session_end(turn: TutorTurn) -> list[GuardFinding]:
+    """The master instructions' end block: understand, proved in the lab, still wrong, THREE retrieval questions,
+    ONE next support case."""
+    end = turn.session_end
+    if end is None:
+        return []
+    findings = []
+    if len(end.retrieval_questions) != 3:
+        findings.append(_f("SESSION_END_RETRIEVAL", "block", f"session_end needs exactly three retrieval questions, "
+                                                             f"not {len(end.retrieval_questions)}."))
+    if not end.next_case.strip():
+        findings.append(_f("SESSION_END_NEXT_CASE", "block", "session_end needs one support case to think about next."))
+    if not end.understand:
+        findings.append(_f("SESSION_END_EMPTY", "warn", "session_end.understand is empty: what should the learner "
+                                                        "now understand?"))
+    return findings
+
+
 def check_speech(turn: TutorTurn) -> list[GuardFinding]:
     findings = []
     if (n := len(turn.speech.split())) > SPEECH_MAX_WORDS:
@@ -355,6 +373,7 @@ def check(turn: TutorTurn, ctx: GuardContext) -> list[GuardFinding]:
         *check_secrets(turn, ctx),
         *check_sql(turn),
         *check_incident(turn, ctx),
+        *check_session_end(turn),
         *check_speech(turn),
         *check_execution_claims(turn, ctx),
         *check_shape(turn),

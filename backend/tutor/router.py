@@ -226,6 +226,9 @@ async def turn(body: TurnRequest, svc: Svc, user: User) -> EventSourceResponse:
                         yield _sse("turn", {"turn_id": turn_id, "turn": event.turn.model_dump(mode="json"),
                                             "usage": event.usage, "model": event.model,
                                             "findings": [f.model_dump() for f in event.findings]})
+                        if event.turn.session_end:  # the five end-of-session headings, kept for the next session
+                            await svc.store.end_session(user, body.session_id,
+                                                        event.turn.session_end.model_dump(mode="json"))
                         if event.turn.incident:  # merge the partial update into the session's incident model
                             current = IncidentState.model_validate(session["incident"] or {})
                             merged, changed = merge(current, event.turn.incident)

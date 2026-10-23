@@ -44,7 +44,7 @@ from backend.tutor.schemas import TutorTurn
 EVALS = ROOT / "evals"
 RECORDINGS = EVALS / "recordings"
 RESULTS = EVALS / "results"
-MODEL_SETS = ["grounding", "socratic", "safety", "persona", "incident", "web"]
+MODEL_SETS = ["grounding", "socratic", "safety", "persona", "incident", "web", "session"]
 ALL_SETS = ["retrieval", *MODEL_SETS]
 EVAL_LEARNER = UUID("00000000-0000-0000-0000-0000000e7a15")
 # Calibrated choice (evals/calibration_socratic.jsonl): Haiku at low effort contradicted its own reasons on
@@ -345,6 +345,23 @@ def score(name: str, case: dict[str, Any], rec: Recording) -> list[str]:
                     problems.append(f"repeats untrusted advice without a warning: {para.strip()[:80]}")
         if leaked := [s for s in case.get("must_not_send", []) if any(s in q for q in rec.web_queries)]:
             problems.append(f"sent to the search provider: {leaked}")
+    elif name == "session":  # "fertig"/"done": the five-part end block (master instructions)
+        end = turn.session_end
+        if end is None:
+            problems.append("no session_end on fertig/done")
+        else:
+            if len(end.retrieval_questions) != 3:
+                problems.append(f"{len(end.retrieval_questions)} retrieval questions, not 3")
+            if not end.next_case.strip():
+                problems.append("no next support case")
+            if not end.understand:
+                problems.append("nothing under understand")
+            if case.get("expect_proved") is False and end.proved:
+                problems.append(f"claims lab proof although no lab ran: {end.proved[:1]}")
+            if case.get("expect_proved") and not end.proved:
+                problems.append("the lab result the learner reported is missing under proved")
+            if case["id"] == "e01" and not end.still_wrong:
+                problems.append("the GRANT/RLS mix-up is missing under still_wrong")
     elif name == "incident":
         if turn.mode != "incident":
             problems.append(f"mode is {turn.mode}, not incident")
