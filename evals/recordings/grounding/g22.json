@@ -1,0 +1,99 @@
+{
+ "case_id": "g22",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "Put insert statements in supabase/seed.sql and run supabase db reset. It wipes the local database, applies migrations, then seeds. If a seed fails with a foreign key violation on cities, what would you check first?",
+  "text": "Put `INSERT` statements in `supabase/seed.sql`, then run `supabase db reset`.\n\n## Minimal workflow\n\nPrerequisite: the local stack is running (`supabase start`). A table must already exist, created by a migration in `supabase/migrations/`.\n\n1. Create `supabase/seed.sql`. This is the default path the CLI looks for. [1]\n\n```sql\ninsert into public.employees (name)\nvalues\n  ('Erlich Bachman'),\n  ('Richard Hendricks'),\n  ('Monica Hall');\n```\n\n2. Apply it:\n\n```bash\nsupabase db reset\n```\n\n> ⚠ Risk: `db reset` destroys the local database and recreates it. It applies all migrations, then runs the seed files. Any other local data or schema changes are discarded. [2][3] Use it only on a disposable local database. Never add `--linked` unless the linked project is a throwaway dev or staging project, because that flag wipes the remote database. [4]\n\nExpected result: the table exists and contains your rows. Check it in Studio or with a `select`.\n\n## When the seed runs\n\n- Seed files run the first time you run `supabase start` and on every `supabase db reset`. [1]\n- Seeding happens after all migrations have completed. [1]\n- Keep seed files to data inserts only, with no schema statements. [1] Schema belongs in migrations.\n\n## Splitting seed files\n\nTo use several files, list them in `supabase/config.toml`:\n\n```toml\n[db.seed]\nenabled = true\nsql_paths = ['./seeds/*.sql']\n```\n\n- Paths are relative to the `supabase` folder, so `./countries.sql` means `supabase/countries.sql`. [5]\n- Files run in the order the `sql_paths` entries are declared. Files matched by one glob run in lexicographic order. [5]\n- Duplicate matches are deduplicated. A pattern that matches nothing logs a warning. [5]\n- If you have foreign keys between seed files, name them so they sort in dependency order (for example `01_countries.sql`, `02_cities.sql`).\n\n## Seeding from existing remote data\n\nYou can dump remote data with `supabase db dump --data-only --linked > supabase/seed.sql`. The docs warn you to remove production user data, secrets and personal information before committing it. They recommend hand-written seed data for most projects. [6]\n\n## What I did not verify\n\nI did not check how to seed `auth.users` (test users with working logins). Seed rows that reference users need valid `auth.users` entries, and that is a common source of foreign-key errors. I can look it up next if you want.\n\nTo check your understanding: you run `supabase db reset` and your seed fails with a foreign-key violation on `cities.country_id`. Based on the execution order above, what is the first thing you would check?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/local-development/seeding-your-database.md#using-seed-files",
+    "title": "Seeding your database > Using seed files",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:50.681406+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/llms/cli.txt#resets-the-local-database-to-current-migrations",
+    "title": "Resets the local database to current migrations",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:40.988705+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/local-development/database-migrations.md#add-sample-data",
+    "title": "Database migrations > Add sample data",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:23.372234+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/local-development/cli-workflows.md#resetting-a-remote-dev-or-staging-project",
+    "title": "Resetting a remote dev or staging project",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:51.768291+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/local-development/seeding-your-database.md#splitting-up-your-seed-file",
+    "title": "Splitting up your seed file",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:50.681406+00:00"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/local-development/cli-workflows.md#step-5-create-seed-data",
+    "title": "Step 5: Create seed data",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:51.768291+00:00"
+   }
+  ],
+  "next_question": "Your seed fails with a foreign-key violation on cities.country_id during db reset. Based on the execution order, what would you check first?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "seeds, step 1"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "seed data local development seed.sql db reset",
+    "products": [
+     "local-development",
+     "cli"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "config.toml db.seed sql_paths",
+    "products": [
+     "cli",
+     "local-development"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2085,
+  "cache_creation_input_tokens": 4217,
+  "cache_read_input_tokens": 37312
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

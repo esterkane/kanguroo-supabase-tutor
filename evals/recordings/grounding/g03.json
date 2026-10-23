@@ -1,0 +1,95 @@
+{
+ "case_id": "g03",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, ohne select-Hülle wertet Postgres die Policy pro Zeile aus, und die Funktion kann jedes Mal neu laufen. Mit select entsteht ein InitPlan, einmal pro Statement. Dazu: Filterspalte indizieren, Rolle mit to angeben. Bei welcher Variante erwartest du im Plan einen InitPlan-Knoten?",
+  "text": "Kleinkünstler, stell dir vor, der Vermieter fragt bei jeder einzelnen Praline im Regal neu nach deinem Ausweis. Genau das passiert bei `auth.uid() = user_id`: Postgres wertet die Policy-Bedingung für jede Zeile aus, die die Abfrage anfasst, und ruft dabei die Funktion unter Umständen jedes Mal erneut auf. [1][2] Die Kosten wachsen also mit der Zahl der gescannten Zeilen. Bei Abfragen, die viele Zeilen durchlaufen (viele `select`, auch mit `limit`, `offset` und Sortierung), fällt das am stärksten ins Gewicht. [3] Der Vergleich hinkt an einer Stelle: `auth.uid()` ist für sich genommen billig. Teuer wird es laut Advisor-Doku erst durch die Wiederholung pro Zeile. [4]\n\nSupabase empfiehlt vor allem drei Regeln. [3]\n\n1. **Funktion mit `select` umhüllen.** Das erzeugt einen `initPlan`, den der Planer einmal pro Statement auswertet und \"cacht\", statt die Funktion pro Zeile aufzurufen. [1]\n2. **Die Filterspalten indizieren.** Das ist die Spalte aus der Policy, hier `user_id`. [3]\n3. **Rollen mit `to` angeben.** `to authenticated` verhindert, dass die Policy überhaupt für `anon` läuft. [5]\n\n```sql\n-- langsamer: Funktionsaufruf steht direkt im Vergleich\ncreate policy \"rls_test_select\" on test_table\nto authenticated\nusing ( auth.uid() = user_id );\n\n-- empfohlen: initPlan, einmal pro Statement ausgewertet\ncreate policy \"rls_test_select\" on test_table\nto authenticated\nusing ( (select auth.uid()) = user_id );\n```\n\nDie Doku nennt auch Grenzen. Der `select`-Trick gilt nur, wenn das Ergebnis nicht von den Zeilendaten abhängt. [1] Joins in Policies sollte man vermeiden: Besser holt man die erlaubten `team_id`s in eine Menge und filtert mit `in`, etwa `team_id in (select team_id from team_user where user_id = (select auth.uid()))`. [6] Bei sehr großen Listen ist laut Doku eine andere Analyse nötig. [6] Mein Stand ist die Doku vom 2026-10-21. Gemessen habe ich hier noch nichts. Den Beweis im Plan holen wir uns im Lab.\n\nPrognose, bevor wir messen: Du vergleichst per `EXPLAIN` die beiden Policy-Varianten auf einer Tabelle mit vielen Zeilen. Bei welcher Variante erwartest du im Plan einen `InitPlan`-Knoten, und woran würdest du erkennen, dass die Funktion nicht pro Zeile läuft?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#call-functions-with-select",
+    "title": "Call functions with select",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/observability/advisors.md#the-performance-issue",
+    "title": "Advisors: The Performance Issue",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:25.539401+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security-performance.md#row-level-security-performance",
+    "title": "Row Level Security performance",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:42.118505+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/observability/advisors.md#rationale",
+    "title": "Advisors: Rationale",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:25.539401+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#specify-roles-in-your-policies",
+    "title": "Specify roles in your policies",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security-performance.md#avoid-joins-in-policy-expressions",
+    "title": "Avoid joins in policy expressions",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:42.118505+00:00"
+   }
+  ],
+  "next_question": "Bei welcher der beiden Policy-Varianten erwartest du im EXPLAIN einen InitPlan-Knoten, und woran erkennst du, dass die Funktion nicht pro Zeile läuft?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "RLS-Performance: auth.uid() und initPlan"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "RLS performance auth.uid() wrap in select initPlan cache",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "RLS performance recommendations index on columns used in policies, specify roles with TO, minimize joins",
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 4614,
+  "cache_creation_input_tokens": 27933,
+  "cache_read_input_tokens": 44428
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

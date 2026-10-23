@@ -1,0 +1,85 @@
+{
+ "case_id": "g21",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, Wall clock ist die Echtzeit-Lebensdauer des Workers, inklusive Warten auf I/O. Die Meldung erscheint laut Doku auch beim normalen Shutdown. Echt kritisch wird es erst mit einer 546-Antwort. Welche Beobachtung holst du als Nächstes, um Rauschen von einem echten Problem zu unterscheiden?",
+  "text": "Kleinkünstler, stell dir vor, der Vermieter erlaubt dem Handwerker, 400 Minuten in der Wohnung zu bleiben, egal ob er arbeitet, Kaffee trinkt oder auf die Lieferung wartet. Danach wird er rausgeworfen. Das ist eine Uhr an der Wand und kein Arbeitszeugnis. Die Analogie hinkt an einer Stelle: Der Handwerker ist hier ein *Worker*, also eine Laufzeitinstanz, und die kann mehrere Anfragen hintereinander bedienen.\n\n**Technisch:**\n\n- **Wall-clock-Limit:** Das ist die gesamte verstrichene Echtzeit, einschließlich Warten auf I/O, externe API-Calls und Sleeps [1]. Laut Limits-Seite sind es 150 s im Free-Plan und 400 s in bezahlten Plänen [2]. Der Worker bleibt in dieser Zeit aktiv und kann mehrere Requests oder Hintergrundtasks bearbeiten [2].\n- **Was die Meldung heißt:** Die Function hat ein Shutdown-Event ausgelöst, entweder weil die Wall-clock-Dauer erreicht war oder weil ein anderes Ressourcenlimit (CPU, Speicher) griff [3].\n- **Vorsicht, die Meldung ist nicht immer ein Fehler:** Laut KB wird der Text fest ausgegeben, sobald ein Worker beendet wird, auch wenn er das Zeitlimit gar nicht erreicht hat. Ein echtes Problem liegt nach dieser Quelle erst vor, wenn zusätzlich eine 546-Antwort zurückkommt [3].\n- **Quellenkonflikt:** Die Seite zu den Shutdown-Reasons nennt pauschal \"400 Sekunden\" [4]. Die Limits-Seite unterscheidet zwischen Free (150 s) und Paid (400 s) [2]. Beide haben denselben Abrufstand (2026-10-21). Ich würde der Limits-Seite folgen, weil sie nach Plan aufschlüsselt. Welcher Plan beim Kunden gilt, wissen wir nicht, also ist das ein Punkt für die Evidenzsammlung.\n\n**Drei Limits, die man leicht verwechselt:**\n\n| Limit | Wert laut Docs | Bedeutung |\n|---|---|---|\n| Wall clock | 150 s Free / 400 s Paid | Lebensdauer des Workers, inklusive Warten [2] |\n| CPU-Zeit | 2 s pro Request | Nur echte Rechenzeit, ohne asynchrones I/O [2] |\n| Request idle timeout | 150 s | Keine Antwort bis dahin, dann 504 Gateway Timeout [2] |\n\nEin `await fetch()` auf eine lahme API verbraucht also Wall-clock-Zeit, aber kaum CPU-Zeit. Das ist der klassische Grund, warum eine Function \"nichts tut\" und trotzdem abgeschossen wird. Die Doku empfiehlt für echte Langläufer, die Arbeit aufzuteilen, Streaming-Antworten zu nutzen oder sie in Queues bzw. Background-Jobs zu verlagern. Außerdem sollten die Operationen idempotent sein, damit ein Retry gefahrlos ist [4]. Das Limit ist laut KB aktuell nicht pro Projekt konfigurierbar, nur beim Self-Hosting des Edge-Runtimes [1].\n\nBevor du irgendetwas \"optimierst\": In den Logs steht die Meldung \"wall clock time limit reached\" und die Function liefert trotzdem normal 200er. Welche zusätzliche Beobachtung würdest du als Nächstes holen, um zu entscheiden, ob das ein echtes Problem ist oder nur Rauschen beim Worker-Shutdown? Mach das. Ich schau derweil, ob noch Pralinen da sind.",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/troubleshooting/edge-function-wall-clock-time-limit-reached-Nk38bW.md#edge-function-wall-clock-time-limit-reached",
+    "title": "Edge Function 'wall clock time limit reached'",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:15.087525+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/functions/limits.md#runtime-limits",
+    "title": "Limits > Runtime limits",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:58.377869+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/troubleshooting/edge-function-wall-clock-time-limit-reached-Nk38bW.md#edge-function-wall-clock-time-limit-reached",
+    "title": "Edge Function 'wall clock time limit reached' (Meldung hart codiert, 546-Hinweis)",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:15.087525+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/troubleshooting/edge-function-shutdown-reasons-explained.md#wallclocktime",
+    "title": "Edge Function shutdown reasons explained > WallClockTime",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:14.756380+00:00"
+   }
+  ],
+  "next_question": "In den Logs steht 'wall clock time limit reached', die Function liefert aber normal 200er: Welche zusätzliche Beobachtung holst du als Nächstes, um zu entscheiden, ob das ein echtes Problem oder nur Rauschen beim Worker-Shutdown ist?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "Edge Function limits: wall clock vs CPU vs idle timeout"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Edge Functions wall clock time limit reached",
+    "products": [
+     "functions",
+     "kb"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Edge Functions limits maximum duration wall clock CPU time",
+    "products": [
+     "functions",
+     "platform"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 5110,
+  "cache_creation_input_tokens": 42140,
+  "cache_read_input_tokens": 95345
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

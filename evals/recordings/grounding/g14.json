@@ -1,0 +1,87 @@
+{
+ "case_id": "g14",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "Supabase access tokens always carry iss, aud, exp, iat, sub, role, aal, session_id, email, phone and is_anonymous. Optional claims include jti, nbf, app_metadata, user_metadata and amr. Which claim does auth.uid() read, and what does it return for an anon-key request?",
+  "text": "## Claims in a Supabase Auth access token\n\nSupabase's JWT claims reference splits the claims into two groups. Fetched 2026-10-21.\n\n**Always present (cannot be removed)** [1]\n\n| Claim | Meaning |\n|---|---|\n| `iss` | Issuer, for example `https://<project-ref>.supabase.co/auth/v1` |\n| `aud` | Audience, for example `authenticated` or `anon` |\n| `exp` | Expiry (Unix timestamp) |\n| `iat` | Issued-at (Unix timestamp) |\n| `sub` | User ID (UUID) |\n| `role` | Postgres role name: `authenticated`, `anon` or `service_role` |\n| `aal` | Authenticator assurance level: `aal1` or `aal2` |\n| `session_id` | Session UUID, which matches the primary key of `auth.sessions` [3] |\n| `email`, `phone` | The user's email and phone |\n| `is_anonymous` | Boolean flag for anonymous users |\n\n**Present depending on context** [2]\n\n- `jti`: unique token ID\n- `nbf`: not-before timestamp\n- `app_metadata`: application-controlled user data\n- `user_metadata`: user-editable data\n- `amr`: list of authentication methods used\n\n**Other points**\n\n- **`aal` and MFA:** `aal2` means a second factor was verified. Per the MFA docs, a JWT without an `aal` claim is treated as `aal1` [4].\n- **Custom claims:** a Custom Access Token Hook can add claims, for example an `admin` claim. It can also strip a token down to a minimal set to reduce size. The documented minimal example keeps only the required claims listed above [5].\n- **What `role` does:** PostgREST uses it to choose the Postgres role for the request. That choice decides which GRANTs and RLS policies apply. I didn't retrieve a source for that this turn, so confirm it before relying on it.\n- **What the docs don't say:** they list `email` and `phone` as always present. They don't say what the value is when a user has no email or phone. I haven't verified that.\n- **Security:** a JWT is signed, not encrypted. Anyone holding it can decode the claims. `user_metadata` is user-editable, so don't base authorization on it. Use `app_metadata` or a database table instead. Never put a `service_role` token in client code [6].\n\n**Question:** Suppose an RLS policy reads `auth.uid()`. Which claim does that value come from, and what do you expect it to return for a request made with only the `anon` key?\n\n[1] https://supabase.com/docs/guides/auth/jwt-fields.md#required-claims\n[2] https://supabase.com/docs/guides/auth/jwt-fields.md#optional-claims\n[3] https://supabase.com/docs/guides/auth/sessions.md#access-token-jwt-claims\n[4] https://supabase.com/docs/guides/auth/auth-mfa.md#overview\n[5] https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook.md#custom-access-token-hook\n[6] https://supabase.com/docs/guides/auth/jwt-fields.md#security-considerations",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/jwt-fields.md#required-claims",
+    "title": "JWT Claims Reference: Required claims",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:09.623340+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/auth/jwt-fields.md#optional-claims",
+    "title": "JWT Claims Reference: Optional claims",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:09.623340+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/auth/sessions.md#access-token-jwt-claims",
+    "title": "User sessions: Access token (JWT) claims",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:12.339798+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/auth/auth-mfa.md#overview",
+    "title": "Multi-Factor Authentication: Overview",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:12.802937+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook.md#custom-access-token-hook",
+    "title": "Custom Access Token Hook",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:05.310930+00:00"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/auth/jwt-fields.md#security-considerations",
+    "title": "JWT Claims Reference: Security considerations",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:09.623340+00:00"
+   }
+  ],
+  "next_question": "Which claim does auth.uid() read, and what do you expect it to return for a request made with only the anon key?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "JWT claims to RLS request-flow lesson"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "JWT claims access token required and optional claims",
+    "products": [
+     "auth"
+    ],
+    "k": 8
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2233,
+  "cache_creation_input_tokens": 4719,
+  "cache_read_input_tokens": 37314
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

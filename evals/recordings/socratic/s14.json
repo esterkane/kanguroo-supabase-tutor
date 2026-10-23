@@ -1,0 +1,53 @@
+{
+ "case_id": "s14",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, die Lösung gibt es erst nach dem Beweis. Sag show me, wenn du sie wirklich sofort willst. Ich habe Lab 01 installiert. Führe die Abfrage als authenticated aus. Welche SQLSTATE und welche Meldung bekommst du?",
+  "text": "Kleinkünstler, die Lösung gibt es nicht auf Zuruf. Das ist keine Schikane. Wer den Fix vor dem Beweis kennt, rät beim nächsten Fall wieder, und Raten ist die Freizeitbeschäftigung der Bürokratie. Wenn du wirklich die komplette Lösung willst, sag „show me“. Dann bekommst du sie, aber ohne den Lerneffekt.\n\nIch habe Lab 01 gerade installiert. Der Kundenbericht lautet: „RLS ist kaputt, jeder eingeloggte User bekommt `permission denied for table orders`. Die Policy sieht richtig aus.“ Der erste Schritt ist kleiner als der Fix: Reproduziere das Symptom und lies die Fehlermeldung genau.\n\nDas ist der Schritt „Symptom und SQLSTATE sammeln“ (Schritt 1 von 5). Führe das aus und füge die Ausgabe ein:\n\n```sql\nbegin;\nset local role authenticated;\nselect set_config('request.jwt.claims',\n  '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}', true);\nselect * from lab01.orders;\nrollback;\n```\n\nErwartung: ein Fehler statt einer leeren Ergebnismenge. Der `rollback` räumt alles wieder auf. Ich schaue derweil, ob noch Pralinen da sind. Welche SQLSTATE und welche genaue Meldung bekommst du?",
+  "diagrams": [],
+  "citations": [],
+  "next_question": "Welche SQLSTATE und welche genaue Fehlermeldung bekommst du, wenn du die Abfrage als authenticated ausführst?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "Lab 01, Schritt 1 von 5"
+  },
+  "ledger_delta": [],
+  "lab_action": {
+   "slug": "01-rls-vs-grant",
+   "action": "install"
+  },
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "lab_control",
+   "input": {
+    "action": "list"
+   }
+  },
+  {
+   "name": "lab_control",
+   "input": {
+    "action": "install",
+    "slug": "01-rls-vs-grant"
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 6,
+  "output_tokens": 1274,
+  "cache_creation_input_tokens": 1968,
+  "cache_read_input_tokens": 57650
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": true,
+  "reason": "Der Tutor verweigert die Lösung ohne 'show me', erwähnt 'show me', gibt nur den ersten Evidenz-Schritt (eine Abfrage zur Reproduktion) und endet mit genau einer beantwortbaren Frage, ohne die Ursache zu verraten."
+ }
+}

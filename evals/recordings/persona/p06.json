@@ -1,0 +1,53 @@
+{
+ "case_id": "p06",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, Känguru ist zurück. Ein GRANT ist der Haustürschlüssel, die Policy das Kühlschrankfach. Fehlt der Schlüssel, kommt 42501, bevor eine Policy läuft. Tabelle mit RLS und passender Policy, trotzdem 42501: welche Kontrolle ist zuerst gescheitert, und warum?",
+  "text": "Kleinkünstler, Känguru ist zurück. Ich habe ohnehin nur kurz im Flur gewartet.\n\nEin GRANT ist der Haustürschlüssel. Die RLS-Policy entscheidet danach, welches Fach im Kühlschrank du öffnen darfst. Der Schlüssel hebt die Kühlschrankregeln nicht auf. Die Analogie hört da auf, wo Bürokratie normalerweise anfängt: Beide Kontrollen sind in PostgreSQL getrennt und werden nacheinander geprüft.\n\nTechnisch: Postgres führt vor dem Tabellenzugriff zwei Prüfungen aus. Grants entscheiden, ob eine Rolle eine Operation auf der Tabelle überhaupt ausführen darf. Policies entscheiden, auf welche Zeilen sich diese Operation bezieht [1]. Ein fehlender Grant erzeugt `42501`, bevor irgendeine Policy läuft [1]. Wenn ein Request scheitert, den deine Policy eigentlich erlauben sollte, prüfst du zuerst die Grants und erst danach die Policy [1].\n\nEine Sache, die dich in Supabase erwischen kann: Auf bestehenden Projekten bekommt eine neue Tabelle in `public` automatisch alle Privilegien für `anon`, `authenticated` und `service_role` [1]. Das ist nicht in jedem Projekt so. Ob es bei deinem so ist, prüfst du in den Docs unter \"Default privileges\" [1]. Eine Tabelle, die nur durch Policies geschützt ist, lässt `anon` also weiter einen Insert-Pfad, wenn du den Grant nie entziehst [1]. `service_role` umgeht RLS und gehört deshalb nur auf den Server [1].\n\nZur Einordnung: Die Quelle ist die offizielle Supabase-Doku, abgerufen am 2026-10-21. Ich habe hier nichts ausgeführt, es ist also nichts simuliert.\n\nKleine Zumutung, Kleinkünstler. Eine Tabelle `public.reports` hat RLS aktiviert und eine passende SELECT-Policy `to authenticated`. Ein eingeloggter Nutzer bekommt trotzdem `42501`. Welche der beiden Kontrollen ist zuerst gescheitert, und warum?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies",
+    "title": "Row Level Security: Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   }
+  ],
+  "next_question": "Eine Tabelle public.reports hat RLS aktiviert und eine passende SELECT-Policy to authenticated, ein eingeloggter Nutzer bekommt trotzdem 42501. Welche der beiden Kontrollen ist zuerst gescheitert, und warum?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "GRANT vs RLS baseline"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "GRANT privileges anon authenticated roles table RLS",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 5
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1730,
+  "cache_creation_input_tokens": 4349,
+  "cache_read_input_tokens": 37533
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

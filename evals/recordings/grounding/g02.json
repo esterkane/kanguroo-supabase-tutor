@@ -1,0 +1,94 @@
+{
+ "case_id": "g02",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "PostgREST connects as authenticator, then switches to anon without a logged-in user, authenticated with one, or service_role with a secret key. A request returns an empty array with HTTP 200. Is that a missing grant or an RLS policy matching no rows?",
+  "text": "PostgREST connects to Postgres as `authenticator`. For each request it then switches to another role, and the JWT determines which one.\n\n| Request | Postgres role during the request |\n|---|---|\n| No logged-in user (publishable key only) | `anon` |\n| Logged-in user (valid Supabase Auth JWT) | `authenticated` |\n| Secret key (server-side only) | `service_role` |\n\nThe `authenticator` role has very limited access. It validates the JWT and then \"changes into\" the role the JWT names [1]. The API-key docs give the same mapping: a publishable key with no signed-in user is `anon`, and with a signed-in user it is `authenticated`. A secret key maps to `service_role` [2].\n\nIf a JWT has no `role` claim, the request runs as `anon` [3]. Third-party auth providers such as Auth0, Firebase and Cognito don't add that claim by default, so you have to set `role` to `authenticated` yourself.\n\n- **Policies:** write RLS policies for `anon` and `authenticated`. `service_role` has `BYPASSRLS`, so policies never apply to it [2].\n- **Check order:** Postgres checks table grants first and applies RLS afterwards. A missing grant returns a permission error, even for `service_role`. A policy that matches no rows returns an empty result instead [2]. Check the grant before you debug the policy.\n- **Legacy keys:** the `anon` and `service_role` JWT keys are legacy versions of the publishable and secret keys. The docs say Supabase is deprecating them by the end of 2026 [4].\n\nSources I did not verify this turn: how PostgREST itself performs the switch internally (`SET LOCAL ROLE`). I can check that in the PostgREST docs if you want it.\n\n```mermaid\nsequenceDiagram\n  participant C as Client\n  participant P as PostgREST\n  participant D as Postgres\n  C->>P: Request + key / user JWT\n  P->>D: Connect as authenticator\n  P->>P: Validate JWT, read role claim\n  P->>D: Switch to anon / authenticated / service_role\n  D->>D: Check GRANTs, then RLS\n  D-->>P: Rows or error\n  P-->>C: HTTP response\n```\n\nQuestion: a request reaches the database as `authenticated`, and the table returns an empty array with HTTP 200. Is that more likely a missing grant or an RLS policy matching no rows? Explain why.",
+  "diagrams": [
+   {
+    "id": "d1",
+    "kind": "sequenceDiagram",
+    "title": "PostgREST role switching",
+    "code": "sequenceDiagram\n  participant C as Client\n  participant P as PostgREST\n  participant D as Postgres\n  C->>P: Request + key / user JWT\n  P->>D: Connect as authenticator\n  P->>P: Validate JWT, read role claim\n  P->>D: Switch to anon / authenticated / service_role\n  D->>D: Check GRANTs, then RLS\n  D-->>P: Rows or error\n  P-->>C: HTTP response"
+   }
+  ],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/roles.md#authenticator",
+    "title": "Postgres Roles: authenticator",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08.087404+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/api/api-keys.md#postgres-roles-and-row-level-security",
+    "title": "API keys: Postgres roles and Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:55.521049+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/auth/third-party/custom-oidc.md#assign-the-role-claim",
+    "title": "Custom OIDC provider: Assign the role claim",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:27.981433+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/api/api-keys.md#which-key-do-you-use",
+    "title": "API keys: Which key do you use?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:55.521049+00:00"
+   }
+  ],
+  "next_question": "A request reaches the database as authenticated, and the table returns an empty array with HTTP 200. Is that more likely a missing grant or an RLS policy matching no rows, and why?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "request flow lesson: role switching"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "PostgREST role switching anon authenticated JWT role claim",
+    "products": [
+     "auth",
+     "database",
+     "api"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "API keys publishable key anon role secret key service_role",
+    "products": [
+     "platform",
+     "api",
+     "auth"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1949,
+  "cache_creation_input_tokens": 24638,
+  "cache_read_input_tokens": 18817
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

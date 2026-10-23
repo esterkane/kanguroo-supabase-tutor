@@ -1,0 +1,105 @@
+{
+ "case_id": "g10",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "Autovacuum stalls either because it isn't running or because it can't remove the dead rows. Documented causes are inactive replication slots, a disabled table setting, and falling behind on a busy table. Long transactions also block it. If all the checks come back clean, what would you check next?",
+  "text": "In general, \"stalled\" autovacuum means one of two things. Either autovacuum isn't running, or it runs but can't remove the dead rows. The causes below are grouped by which of the two they produce.\n\n## Documented in Supabase sources\n\n| Cause | Effect | Source |\n|---|---|---|\n| **Inactive replication slot** (logical or physical) | Autovacuum can't clean past the point the slot holds back. Dead tuples pile up and bloat grows. | [1] |\n| **`autovacuum_enabled=false` on a table** | Autovacuum skips the table. Supabase has an advisor lint for this (`0030_autovacuum_disabled`). | [3] |\n| **Autovacuum can't keep up** (high-write tables, conservative settings, limited compute or disk IOPS) | Dead rows accumulate faster than they're removed. `vacuum-stats` shows \"Expect autovacuum? yes\" but the last autovacuum is old. | [2] [4] |\n| **Wraparound-prevention autovacuum** | It can't be cancelled, and it competes with your workload for CPU and I/O. This is a different problem from a stall: it is autovacuum doing mandatory work. | [5] |\n\n## Standard PostgreSQL causes (not retrieved from the docs this turn)\n\nThese come from general PostgreSQL knowledge. Verify them against https://www.postgresql.org/docs/current/routine-vacuuming.html before relying on them.\n\n- **Long-running transactions**, including `idle in transaction` sessions. Vacuum can only remove row versions that no open snapshot can still see, so one old transaction holds back cleanup on every table.\n- **Orphaned prepared transactions** (`pg_prepared_xacts`) have the same effect.\n- **Lock conflicts.** Autovacuum cancels itself when it blocks a conflicting lock request, such as certain DDL.\n\nThe Supabase KB describes slots as keeping \"older snapshot\" state [1]. The precise mechanism is that a slot holds back `xmin` or `catalog_xmin`. The effect is the same: the cleanup horizon can't advance.\n\n## Read-only checks\n\n```sql\n-- 1. Oldest open transactions (look at xact_start, state)\nselect pid, usename, state, xact_start, now() - xact_start as xact_age, left(query, 80) as query\nfrom pg_stat_activity\nwhere xact_start is not null\norder by xact_start\nlimit 5;\n\n-- 2. Replication slots, including inactive ones\nselect slot_name, slot_type, active, xmin, catalog_xmin\nfrom pg_replication_slots;\n\n-- 3. Prepared transactions (should normally be empty)\nselect * from pg_prepared_xacts;\n\n-- 4. Dead rows and last autovacuum per table [3]\nselect relname, n_live_tup, n_dead_tup, last_autovacuum\nfrom pg_stat_all_tables\nwhere schemaname = 'public'\norder by n_dead_tup desc\nlimit 10;\n```\n\nExpected result: on a healthy project, queries 1 to 3 show nothing old and query 4 shows recent `last_autovacuum` values. A slot with `active = false` and an old `xmin` or `catalog_xmin` is a strong suspect.\n\nThe Supabase KB fix is to drop inactive slots with `pg_drop_replication_slot` [1].\n\n> ⚠ Risk: dropping a slot discards the replication position. If a consumer such as a CDC tool or replica still needs it, that consumer must be re-synced. Confirm what owns the slot before dropping it.\n\nTo see what autovacuum is doing, you can set `log_autovacuum_min_duration` [6]. Then `supabase inspect db vacuum-stats` shows the stats from the CLI side [2].\n\n**What this doesn't prove:** a high `n_dead_tup` shows that cleanup is behind. It doesn't show why. Query 1 and query 2 are the discriminating tests.\n\nSuppose a table has a high `n_dead_tup`, and every query above comes back clean: no old transactions, no slots, no prepared transactions. What would you check next?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/kb/troubleshooting/autovacuum-stalled-due-to-inactive-replication-slot.md#autovacuum-stalled-due-to-inactive-replication-slot",
+    "title": "Autovacuum Stalled Due to Inactive Replication Slot",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:44.769049Z"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/llms/cli.txt#show-statistics-related-to-vacuum-operations-per-table",
+    "title": "Show statistics related to vacuum operations per table",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:40.988705Z"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/observability/advisors.md#0030-autovacuum-disabled",
+    "title": "0030_autovacuum_disabled",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:25.539401Z"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/observability/advisors.md#what-causes-bloat",
+    "title": "What Causes Bloat?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:25.539401Z"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/troubleshooting/high-cpu-and-slow-queries-with-error-must-be-a-superuser-to-terminate-superuser-process.md#understanding-the-problem-a-critical-autovacuum",
+    "title": "High CPU and Slow Queries with ERROR: must be a superuser to terminate superuser process",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:32.912606Z"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/database/postgres/postgres-log-config.md#log-autovacuum-min-duration",
+    "title": "log_autovacuum_min_duration",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:40.030668Z"
+   }
+  ],
+  "next_question": "If a table has high n_dead_tup but no old transactions, no inactive slots and no prepared transactions exist, what would you check next?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "autovacuum stall diagnosis"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": [
+   "CITATION_UNUSED"
+  ]
+ },
+ "findings": [
+  "CITATION_UNUSED"
+ ],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "autovacuum not running dead tuples long-running transactions replication slots prevent vacuum",
+    "products": [
+     "database",
+     "kb",
+     "platform"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "vacuum-stats inspect db bloat autovacuum settings",
+    "products": [
+     "cli",
+     "database",
+     "observability"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 3160,
+  "cache_creation_input_tokens": 9241,
+  "cache_read_input_tokens": 37314
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

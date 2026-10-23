@@ -1,0 +1,110 @@
+{
+ "case_id": "g12",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "The error means Postgres is at its connection limit and refuses non-superuser connections. A restart only clears the symptom. First check who holds the connections. Does your application connect directly on port 5432, or through the pooler?",
+  "text": "Neutral mode. Here is what the error means, then what to check.\n\n## What it means\n\nThis is a PostgreSQL connection-admission error, not a query error. The server is at its connection limit, so it refuses new non-superuser connections. Supabase's docs say it appears when the database reaches the maximum number of connections allowed for your compute add-on [1][2]. Postgres holds back a few of its slots for superuser sessions, so an admin can still get in during an overload. The server calls the remaining slots \"reserved\" for that purpose.\n\nI did not retrieve the PostgreSQL docs this turn. The explanation of the reserved-slot setting (`superuser_reserved_connections`) comes from my background knowledge, so verify it in the `max_connections` section of the PostgreSQL docs.\n\nThe limit applies to the whole database, not to your app alone. Supabase services such as Auth, Storage and PostgREST hold their own connections, and these count against the same total [4]. The total is:\n\n```txt\nDirect connections + Supavisor backend connections + PgBouncer backend connections < Postgres max connections\n```\n\n## How to fix it\n\nA restart only clears the symptom. The docs say a restart helps temporarily but doesn't fix the underlying issue [3]. A restart clears the connections that were open, so the real question is what opened them and why they stayed open.\n\nThe documented options are:\n\n1. **Use the pooler instead of direct connections.** For this exact error, the docs recommend switching to the connection pooler [3][2].\n2. **Make clients use fewer connections.** Examples are a small per-process pool in serverless functions, closing connections when done, and shorter queries [1]. The Prisma guide suggests starting serverless setups at `connection_limit=1` [6].\n3. **Check the pool size.** Supavisor's pool size is the maximum number of backend connections per user, database and mode combination [7]. If you use the REST API heavily, keep the pooler under about 40% of max connections. Otherwise you can go up to about 80% [5]. Storage uses its own user, database and mode combination, which shares that pool size setting [8].\n4. **Increase compute** if you already use pooling and still hit the limit [2].\n\n## Evidence to collect first\n\nRun these as a read-only diagnostic. If the error blocks your normal connection, try the dashboard SQL editor or a different role, because I can't see how your project behaves from here.\n\n```sql\n-- Who holds the connections, and are they doing anything?\nselect usename, application_name, state, count(*) as conns,\n       max(now() - state_change) as longest_in_state\nfrom pg_stat_activity\nwhere backend_type = 'client backend'\ngroup by usename, application_name, state\norder by conns desc;\n\nselect current_setting('max_connections') as max_connections;\n```\n\nMany rows in `idle` or `idle in transaction` from one `application_name` point to a client that leaks connections or holds transactions open. Many `active` rows point to slow queries. The two cases have different fixes.\n\nThis query does not prove which client is at fault if `application_name` is empty. It also doesn't show connections the pooler holds open on your behalf.\n\n> ⚠ Risk: terminating backends with `pg_terminate_backend()` cancels in-flight work and rolls back open transactions. Do this only after you have identified the sessions, and prefer a disposable database for practice.\n\n**Question:** Does your application connect directly to the database host (port 5432), or through the pooler?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/platform/performance.md#optimizing-the-number-of-connections",
+    "title": "Optimizing the number of connections",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.511646+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/troubleshooting/database-error-remaining-connection-slots-are-reserved-for-non-replication-superuser-connections-3V3nIb.md#database-error-remaining-connection-slots-are-reserved-for-non-replication-superuser-connections",
+    "title": "Database Error: remaining connection slots are reserved for non-replication superuser connections",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:11.338604+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/troubleshooting/http-api-issues.md#too-many-open-connections",
+    "title": "Too many open connections",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:20.543053+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/database/connecting-to-postgres/pooling-and-limits.md#client-connections-and-backend-connections-client-connections-and-backend-connections",
+    "title": "Client connections and backend connections",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:28.205428+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/database/connection-management.md#configuring-supavisor-s-pool-size",
+    "title": "Configuring Supavisor's pool size",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:07.811026+00:00"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/database/prisma/prisma-troubleshooting.md#max-client-connections-reached",
+    "title": "Max client connections reached",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:30.022205+00:00"
+   },
+   {
+    "n": 7,
+    "url": "https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI.md#in-the-context-of-supavisor-what-does-pool-size-mean",
+    "title": "Supavisor FAQ: what does pool size mean",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:29.721925+00:00"
+   },
+   {
+    "n": 8,
+    "url": "https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI.md#whether-to-change-supavisor-s-pool-size",
+    "title": "Supavisor FAQ: whether to change pool size",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:29.721925+00:00"
+   }
+  ],
+  "next_question": "Does your application connect directly to the database host (port 5432), or through the pooler?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "connection-exhaustion triage"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "remaining connection slots are reserved for non-replication superuser connections",
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "max connections pooler Supavisor pool size connection limit",
+    "products": [
+     "database",
+     "platform",
+     "kb"
+    ],
+    "k": 8
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 3152,
+  "cache_creation_input_tokens": 65204,
+  "cache_read_input_tokens": 37323
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

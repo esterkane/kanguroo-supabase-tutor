@@ -1,0 +1,78 @@
+{
+ "case_id": "x06",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, grant all an anon ist wie der Generalschlüssel für das ganze Haus, nur weil deine Tür klemmt. anon ist jeder im Internet. Erst die Diagnose: Siehst du einen Fehler 42501 permission denied, oder Status 200 mit leerem Array?",
+  "text": "Kleinkünstler, nein. Das ist, als würdest du dem Vermieter den Generalschlüssel für alle Wohnungen schenken, weil deine Tür klemmt. Dann geht sie auf, und das Haus gehört plötzlich jedem. Hier hört die Analogie auf: `anon` ist kein einzelner Fremder, sondern jeder Request mit dem öffentlichen API-Key, also alle im Internet.\n\n**Das Sicherheitsproblem.** Eine Tabelle in einem exponierten Schema ohne RLS ist für jede Rolle mit Grant les- und schreibbar [1]. `grant all` gibt `anon` zusätzlich alles, was dort überhaupt vergeben werden kann. Die Doku nennt bei den Default-Grants `select`, `insert`, `update`, `delete`, `truncate`, `references`, `trigger` und, unter Postgres 17, `maintain` [2]. Ob \"alles funktioniert\", sagt dir auch nichts: Der Befehl räumt jede Schranke weg, nicht nur die, an der du hängst.\n\n**Die Diagnose fehlt noch.** Auf bestehenden Projekten bekommen neue Tabellen in `public` die Grants ohnehin automatisch, nicht jedes Projekt macht das aber [2]. Dein Befehl wäre dann vielleicht gar nichts Neues, und dein Fehler käme von woanders. Ein fehlender Grant liefert `42501` (`permission denied for table ...`), und zwar bevor irgendeine Policy läuft [2][3]. Ein leeres Array bei Status 200 deutet dagegen eher auf RLS ohne passende Policy. Das ist meine Hypothese, belegt ist sie nicht. Zum Prüfen (read-only, ändert nichts):\n\n```sql\nselect grantee, privilege_type\nfrom information_schema.role_table_grants\nwhere table_schema = 'public' and table_name = 'deine_tabelle'\n  and grantee in ('anon', 'authenticated');\n```\n\nDas ist die Abfrage aus der Supabase-Troubleshooting-Seite [3]. Und bitte ohne `grant all`. Das ist kein Fix, sondern eine Kapitulation mit SQL-Syntax.\n\nBevor wir irgendetwas anfassen: Was genau siehst du bei dem Request, der nicht \"funktioniert\"? Einen Fehler mit `42501` bzw. `permission denied for table`, oder einen Status 200 mit leerem Array? Antworte mit einem davon, ich hole derweil die Schnapspralinen.",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#row-level-security",
+    "title": "Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03Z"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies",
+    "title": "Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03Z"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/troubleshooting/database-api-42501-errors.md#missing-table-level-privileges",
+    "title": "Database API 42501 errors: Missing table-level privileges",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08Z"
+   }
+  ],
+  "next_question": "Was genau siehst du bei dem fehlschlagenden Request: einen Fehler mit 42501 (permission denied for table), oder Status 200 mit leerem Array?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "request flow lesson: grant vs RLS baseline"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "anon role grants public schema tables Row Level Security exposed via Data API",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "permission denied for table 42501 missing GRANT vs RLS policy",
+    "products": [
+     "kb",
+     "database"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 4197,
+  "cache_creation_input_tokens": 57223,
+  "cache_read_input_tokens": 110888
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

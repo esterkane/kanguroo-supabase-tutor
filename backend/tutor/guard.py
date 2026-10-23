@@ -74,6 +74,7 @@ class GuardContext:
 
     sources: dict[str, int] = field(default_factory=dict)
     ran_lab_sql: bool = False
+    learner_text: str = ""  # secrets the learner pasted must not be repeated back, not even in a warning
 
 
 def _norm(url: str) -> str:
@@ -158,10 +159,17 @@ def _secrets_in(text: str) -> list[str]:
     return found
 
 
-def redact_secrets(turn: TutorTurn) -> TutorTurn:
-    """Last line of defense: replace secrets in learner-visible fields."""
+def learner_secrets(learner_text: str) -> list[str]:
+    """Secrets in the learner's message (a pasted key or connection-string password), longest first."""
+    return sorted(set(_secrets_in(learner_text)), key=len, reverse=True)
+
+
+def redact_secrets(turn: TutorTurn, learner_text: str = "") -> TutorTurn:
+    """Last line of defense: replace secrets in learner-visible fields, incl. ones the learner pasted."""
+    known = learner_secrets(learner_text)
+
     def scrub(text: str) -> str:
-        for secret in _secrets_in(text):
+        for secret in [*known, *_secrets_in(text)]:
             text = text.replace(secret, "[REDACTED]")
         return text
 
@@ -184,9 +192,9 @@ def check_questions(turn: TutorTurn) -> list[GuardFinding]:
                                                       "most discriminating one."))
     prose, _ = split_markdown(turn.text)
     asked = [s for s in sentences(prose) if s.endswith("?") and not s.startswith(">")]
-    if len(asked) > 2:
-        findings.append(_f("MULTI_QUESTION", "warn", f"{len(asked)} questions in the text; ask one, rhetorical "
-                                                     "ones count for the learner too."))
+    if len(asked) > 1 and turn.mode in QUESTION_MODES and turn.session_end is None:
+        findings.append(_f("MULTI_QUESTION", "block", f"{len(asked)} questions in the text; end with exactly one, "
+                                                      "rhetorical ones count for the learner too."))
     if q and not _question_in_text(q, turn.text):
         findings.append(_f("QUESTION_NOT_IN_TEXT", "warn", "Put next_question at the end of the Markdown too."))
     return findings
@@ -246,9 +254,10 @@ def check_uncited_claims(turn: TutorTurn) -> list[GuardFinding]:
                + " | ".join(f'"{s[:90]}"' for s in bad[:3]))]
 
 
-def check_secrets(turn: TutorTurn) -> list[GuardFinding]:
+def check_secrets(turn: TutorTurn, ctx: GuardContext | None = None) -> list[GuardFinding]:
     fields = [turn.text, turn.speech, *(d.code for d in turn.diagrams)]
-    if any(_secrets_in(f) for f in fields):
+    pasted = learner_secrets(ctx.learner_text) if ctx else []
+    if any(_secrets_in(f) for f in fields) or any(secret in f for secret in pasted for f in fields):
         return [_f("SECRET_LEAK", "block", "Remove keys, JWTs and real passwords; use placeholders like "
                                           "<SERVICE_ROLE_KEY> or [YOUR-PASSWORD] and say they stay server-side.")]
     return []
@@ -311,7 +320,7 @@ def check(turn: TutorTurn, ctx: GuardContext) -> list[GuardFinding]:
         *check_questions(turn),
         *check_citations(turn, ctx),
         *check_uncited_claims(turn),
-        *check_secrets(turn),
+        *check_secrets(turn, ctx),
         *check_sql(turn),
         *check_incident(turn),
         *check_speech(turn),

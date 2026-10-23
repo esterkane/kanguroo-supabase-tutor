@@ -1,0 +1,33 @@
+{
+ "case_id": "p05",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, ich bin zurück. Plan: Basisfall, Voraussetzungen prüfen, Wegwerf-Lab, dann ein Request von Client bis Tabelle. Erster Fall: RLS-Policy erlaubt eigene Zeilen, aber authenticated hat kein SELECT. Was passiert, und welche Kontrolle greift zuerst, GRANT oder Policy?",
+  "text": "Känguru ist zurück, Kleinkünstler. Ich wohne weiter mietfrei hier und nenne das ein politisches Statement.\n\nDas Ziel ist Supabase-Support-Engineering auf Tiefe, nicht Hübsch-Klicken. Der Plan:\n\n1. Ein Basisfall, damit ich sehe, was du schon weißt.\n2. Die macOS-Voraussetzungen prüfen, vor allem welche Docker-kompatible Runtime installiert ist.\n3. Ein Wegwerf-Lab mit der Supabase CLI starten.\n4. Einen Request verfolgen: Client, API, PostgREST, Postgres-Rolle, GRANT, RLS, Tabelle.\n\nDanach baue ich dir absichtlich etwas Kaputtes, und du suchst den Fehler.\n\nZum Einstieg ein kleiner Fall. Eine Tabelle `notes` hat RLS aktiviert und eine Policy, die jeder angemeldeten Person ihre eigenen Zeilen erlaubt. Der Rolle `authenticated` wurde aber nie `SELECT` auf die Tabelle gegeben. Ein angemeldeter Nutzer fragt seine eigenen Notizen ab.\n\nWas passiert, und welche der beiden Kontrollen greift zuerst: GRANT oder die RLS-Policy?",
+  "diagrams": [],
+  "citations": [],
+  "next_question": "Eine Tabelle hat RLS und eine Policy für eigene Zeilen, aber authenticated hat kein SELECT-Privileg: Was passiert bei der Abfrage, und welche Kontrolle greift zuerst, GRANT oder Policy?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "baseline case: GRANT vs RLS"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [],
+ "usage": {
+  "input_tokens": 2,
+  "output_tokens": 1328,
+  "cache_creation_input_tokens": 243,
+  "cache_read_input_tokens": 18639
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

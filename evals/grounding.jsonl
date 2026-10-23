@@ -1,0 +1,30 @@
+{"id": "g01", "prompt": "Was bedeutet der Fehler 42501 'permission denied for table' bei einer Abfrage über die API?", "mode": "lesson", "language": "de", "cite_any": ["database-api-42501", "securing-your-api", "row-level-security"]}
+{"id": "g02", "prompt": "Which Postgres role does PostgREST use for requests with and without a logged-in user?", "mode": "neutral", "language": "en", "cite_any": ["postgres/roles", "api-keys", "securing-your-api"]}
+{"id": "g03", "prompt": "Warum kann eine RLS-Policy mit auth.uid() langsam sein, und was empfiehlt Supabase dagegen?", "mode": "lesson", "language": "de", "cite_any": ["row-level-security-performance", "rls-performance-and-best-practices"]}
+{"id": "g04", "prompt": "What is the difference between the anon key and the service_role key?", "mode": "neutral", "language": "en", "cite_any": ["api-keys", "securing-your-api"]}
+{"id": "g05", "prompt": "Wie ändere ich den statement_timeout für eine Rolle?", "mode": "lesson", "language": "de", "cite_any": ["timeouts", "statement-timeout"]}
+{"id": "g06", "prompt": "Why do I get 'prepared statement already exists' with the transaction pooler?", "mode": "neutral", "language": "en", "cite_any": ["disabling-prepared-statements", "supavisor-faq", "prisma"]}
+{"id": "g07", "prompt": "Was ist der Unterschied zwischen Session Mode und Transaction Mode bei Supavisor?", "mode": "lesson", "language": "de", "cite_any": ["supavisor", "pooling", "connecting-to-postgres"]}
+{"id": "g08", "prompt": "How can I see which queries consume the most total execution time?", "mode": "neutral", "language": "en", "cite_any": ["pg_stat_statements", "query-optimization", "high-cpu"]}
+{"id": "g09", "prompt": "Warum wird meine Datenbank nach dem Löschen vieler Zeilen nicht kleiner?", "mode": "lesson", "language": "de", "cite_any": ["disk-size-not-shrinking", "database-size"]}
+{"id": "g10", "prompt": "What can stall autovacuum on a Supabase project?", "mode": "neutral", "language": "en", "cite_any": ["autovacuum-stalled", "replication"]}
+{"id": "g11", "prompt": "Wie finde ich heraus, welche Postgres-Version mein Projekt nutzt?", "mode": "lesson", "language": "de", "cite_any": ["which-version-of-postgres"]}
+{"id": "g12", "prompt": "What does 'remaining connection slots are reserved' mean and how do I fix it?", "mode": "neutral", "language": "en", "cite_any": ["remaining-connection-slots", "max-database-connections", "too-many-connections"]}
+{"id": "g13", "prompt": "Wie füge ich einen eigenen Claim (z. B. user_role) ins JWT ein?", "mode": "lesson", "language": "de", "cite_any": ["custom-access-token-hook", "custom-claims"]}
+{"id": "g14", "prompt": "Which claims are in a Supabase Auth access token?", "mode": "neutral", "language": "en", "cite_any": ["jwt-fields", "jwts"]}
+{"id": "g15", "prompt": "Wie schränke ich ein, welche Spalten eine Rolle lesen darf?", "mode": "lesson", "language": "de", "cite_any": ["column-level-security"]}
+{"id": "g16", "prompt": "Why does a Storage upload fail with 'new row violates row-level security policy'?", "mode": "neutral", "language": "en", "cite_any": ["storage-error-403", "access-control"]}
+{"id": "g17", "prompt": "Warum kommen Realtime Postgres Changes im Client nicht an?", "mode": "lesson", "language": "de", "cite_any": ["realtime-messages-not-arriving", "postgres-changes"]}
+{"id": "g18", "prompt": "What does the Realtime TIMED_OUT status mean?", "mode": "neutral", "language": "en", "cite_any": ["timed_out"]}
+{"id": "g19", "prompt": "Wie setze ich Secrets für Edge Functions?", "mode": "lesson", "language": "de", "cite_any": ["functions/secrets", "environment-variables"]}
+{"id": "g20", "prompt": "My Edge Function fails with a CORS error from the browser. What is needed?", "mode": "neutral", "language": "en", "cite_any": ["functions/cors"]}
+{"id": "g21", "prompt": "Was bedeutet 'wall clock time limit reached' bei Edge Functions?", "mode": "lesson", "language": "de", "cite_any": ["wall-clock-time-limit"]}
+{"id": "g22", "prompt": "How do I seed data into my local Supabase database?", "mode": "neutral", "language": "en", "cite_any": ["seeding-your-database"]}
+{"id": "g23", "prompt": "Wie starte ich ein lokales Supabase-Projekt mit der CLI?", "mode": "lesson", "language": "de", "cite_any": ["cli/getting-started", "local-development", "guides/cli"]}
+{"id": "g24", "prompt": "What backup options does Supabase offer, including point in time recovery?", "mode": "neutral", "language": "en", "cite_any": ["platform/backups"]}
+{"id": "g25", "prompt": "Warum dauert ALTER TABLE beim Ändern eines Spaltentyps auf einer großen Tabelle so lange?", "mode": "lesson", "language": "de", "cite_any": ["slow-execution-of-alter-table"]}
+{"id": "g26", "prompt": "Why would Postgres not use my index?", "mode": "neutral", "language": "en", "cite_any": ["how-postgres-chooses-which-index", "indexes", "query-optimization"]}
+{"id": "g27", "prompt": "Was bedeutet 'cannot execute UPDATE in a read-only transaction' am Transaction Pooler?", "mode": "lesson", "language": "de", "cite_any": ["read-only-transaction"]}
+{"id": "g28", "prompt": "How do I rotate the JWT secret and API keys?", "mode": "neutral", "language": "en", "cite_any": ["rotating-anon-service-and-jwt-secrets", "api-keys"]}
+{"id": "g29", "prompt": "Warum schlägt eine Migration mit 'permission denied for database postgres' fehl?", "mode": "lesson", "language": "de", "cite_any": ["permission-denied-for-database-postgres"]}
+{"id": "g30", "prompt": "What is the connection limit of my project and how do I change it?", "mode": "neutral", "language": "en", "cite_any": ["max-database-connections", "compute-and-disk", "pooling-and-limits"]}

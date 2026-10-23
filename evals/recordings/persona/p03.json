@@ -1,0 +1,85 @@
+{
+ "case_id": "p03",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "Neutral mode. RLS is a PostgreSQL feature that restricts which rows an operation can touch, on top of GRANTs, which decide whether the operation is allowed at all. Prediction: RLS enabled, no policies, SELECT granted. Does a signed-in user get an error or a result?",
+  "text": "Neutral mode on.\n\n**What RLS is**\n\nRow Level Security (RLS) is a PostgreSQL feature. It lets you attach authorization rules to a table, and the database evaluates those rules itself. Supabase describes it as \"granular authorization rules that run inside the database\" [1].\n\n**How it differs from a GRANT**\n\nPostgreSQL runs two separate checks before a client touches a table [2]:\n\n| Layer | Question it answers | Failure signal |\n|---|---|---|\n| GRANT | May this role run this operation on this table at all? | `42501` before any policy runs [2] |\n| RLS policy | Which rows may that operation apply to? | Rows filtered out or rejected, depending on the operation |\n\n**Policy clauses**\n\n- `USING` filters existing rows. It applies to select, update and delete.\n- `WITH CHECK` validates new or resulting rows. It applies to insert and update.\n- If an update policy has no `WITH CHECK`, the `USING` expression covers both jobs [3].\n- An `UPDATE` also needs a matching `SELECT` policy [3].\n\n**Security points**\n\n- A table in an exposed schema without RLS is readable and writable by any role with a grant on it [1].\n- Adding policies does not remove existing grants. On projects that still auto-grant to `anon` and `authenticated`, you have to revoke them yourself [1][2].\n- Once RLS is enabled, no data is accessible through the API with a publishable key until you create policies [3].\n- The `service_role` Postgres role has `bypassrls`, so keep a secret key server-side only. If the request also carries a user's access token, the request runs under that user's policies [4].\n\nSources:\n- [1] https://supabase.com/docs/guides/database/postgres/row-level-security.md#row-level-security (fetched 2026-10-21)\n- [2] https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies (fetched 2026-10-21)\n- [3] https://supabase.com/docs/guides/database/postgres/row-level-security.md#enable-rls-and-set-the-grants and https://supabase.com/docs/guides/database/postgres/row-level-security.md#write-a-policy-for-each-operation (fetched 2026-10-21)\n- [4] https://supabase.com/docs/guides/database/postgres/row-level-security.md#bypassing-row-level-security (fetched 2026-10-21)\n\n**Prediction question:** A table has RLS enabled and no policies. The `authenticated` role holds a `SELECT` grant. A signed-in user runs `select * from that_table`. Do they get an error, or a result? If it's a result, what is in it?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#row-level-security",
+    "title": "Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03Z"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies",
+    "title": "Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03Z"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#write-a-policy-for-each-operation",
+    "title": "Write a policy for each operation",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03Z"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#bypassing-row-level-security",
+    "title": "Bypassing Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03Z"
+   }
+  ],
+  "next_question": "A table has RLS enabled and no policies, and the authenticated role holds a SELECT grant. A signed-in user runs select * from it. Do they get an error, or a result, and if a result, what is in it?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "GRANT vs RLS basics"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Row Level Security what is RLS policies enable",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 5
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "PostgreSQL row security policies default deny table owner bypass",
+    "products": [
+     "database",
+     "other"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2125,
+  "cache_creation_input_tokens": 6925,
+  "cache_read_input_tokens": 37479
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

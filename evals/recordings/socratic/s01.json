@@ -1,0 +1,56 @@
+{
+ "case_id": "s01",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, ein GRANT ist der Haustürschlüssel, RLS die Hausregel pro Kühlschrankfach. Beide sind getrennte Kontrollen. Angenommen anon hat SELECT, RLS ist an, aber es gibt keine Policy. Fehler, alle Zeilen oder null Zeilen?",
+  "text": "Kleinkünstler, stell dir die WG-Küche vor. Mit dem Haustürschlüssel kommst du rein, aber ob du an meine Schnapspralinen darfst, regelt eine Hausregel pro Fach. Das ist eine Bürokratie, die ausnahmsweise etwas Sinnvolles tut. Die Analogie hinkt an einer Stelle: In der Datenbank prüft nicht ich als Wächter, sondern PostgreSQL selbst bei jeder Anfrage.\n\nTechnisch ist Row Level Security (RLS) ein PostgreSQL-Mechanismus. Er legt pro Tabelle Regeln (Policies) fest, die bestimmen, welche **Zeilen** eine Rolle lesen oder ändern darf. Die Regeln laufen in der Datenbank selbst [1]. Der Haustürschlüssel entspricht dem GRANT, also dem Recht, eine Operation auf der Tabelle überhaupt auszuführen. RLS ist eine zweite, getrennte Kontrolle darüber. Die Doku warnt: Eine Tabelle in einem exponierten Schema ohne RLS ist für jede Rolle mit einem Grant les- und schreibbar [1].\n\nDas ist erst der erste Schritt, den Rest holen wir uns im Lab.\n\nAngenommen, `anon` hat ein SELECT-Grant auf eine Tabelle, RLS ist aktiviert, aber es existiert keine einzige Policy. Was liefert `select * from tabelle` dann: einen Fehler, alle Zeilen oder null Zeilen?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#row-level-security",
+    "title": "Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:21.009992+00:00"
+   }
+  ],
+  "next_question": "Angenommen, anon hat ein SELECT-Grant auf eine Tabelle, RLS ist aktiviert, aber es existiert keine einzige Policy. Was liefert select * from tabelle dann: einen Fehler, alle Zeilen oder null Zeilen?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "RLS basics, step 1"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Row Level Security policies enable RLS",
+    "products": [
+     "database",
+     "auth"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1278,
+  "cache_creation_input_tokens": 2689,
+  "cache_read_input_tokens": 37799
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": true,
+  "reason": "Der Tutor erklärt das aktuelle Konzept (RLS, GRANT vs. Policy) mit Analogie, gibt weder Fix noch Root Cause preis und endet mit genau einer beantwortbaren Frage, sodass der Lernende selbst überlegen muss."
+ }
+}

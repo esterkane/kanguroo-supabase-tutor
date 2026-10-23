@@ -1,0 +1,36 @@
+{
+ "case_id": "s07",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, ein Zeitfilter verkleinert den Suchraum, ändert aber die Frage. Wer vor 45 Tagen zuletzt bestellt hat, bekäme nichts statt 20 Zeilen. Führ die Zählquery im Lab aus. Was bedeutet eine Zahl größer als null für dein Frontend?",
+  "text": "Kleinkünstler, der Gedanke hat einen Namen: den Suchraum verkleinern. Das ist legitim, und ein Zeitfilter kann das Seq Scan tatsächlich billiger machen. Er ist aber wie ein Vermieter, der die Hausordnung \"vereinfacht\", indem er alle Mieter mit Altverträgen streicht. Es geht schneller, aber das Ergebnis ist ein anderes.\n\nQuery A will die letzten 20 Bestellungen des Kunden, egal wie alt sie sind. Mit `created_at > now() - interval '30 days'` bekäme ein Kunde, dessen letzte Bestellung 45 Tage zurückliegt, 0 Zeilen statt 20. Die Frage ändert sich, nicht nur ihre Geschwindigkeit. Prüfen wir, ob das in deinen Daten überhaupt vorkommt. Das ist read-only, aber auf einer großen Tabelle trotzdem ein voller Scan, also nur im Lab.\n\n```sql\n-- Wie viele Kunden hätten bei einem 30-Tage-Filter gar keine Treffer?\nselect count(*) as kunden_ohne_treffer\nfrom (\n  select customer_id\n  from public.orders\n  group by customer_id\n  having max(created_at) < now() - interval '30 days'\n) t;\n```\n\nFühr das im Lab aus und poste das Ergebnis. Ich schau derweil, ob noch Pralinen da sind. Wenn die Zahl größer als 0 ist, was bedeutet das für die Antworten, die dein Frontend dann anzeigt?",
+  "diagrams": [],
+  "citations": [],
+  "next_question": "Wenn die Zahl größer als 0 ist, was bedeutet das für die Antworten, die dein Frontend dann anzeigt?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "Query A: Index-Entwurf, Schritt 2"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [],
+ "usage": {
+  "input_tokens": 2,
+  "output_tokens": 1308,
+  "cache_creation_input_tokens": 985,
+  "cache_read_input_tokens": 18507
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": true,
+  "reason": "Das Tutor-Reply würdigt die Idee des Lerners, korrigiert sie (Semantik ändert sich), liefert nur eine evidenzsammelnde Abfrage statt der Lösung und endet mit genau einer beantwortbaren Frage, sodass der Lerner die Schlussfolgerung selbst ziehen muss."
+ }
+}

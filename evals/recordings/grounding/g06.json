@@ -1,0 +1,96 @@
+{
+ "case_id": "g06",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "Prepared statements live on one backend connection. In transaction mode your next transaction may land on a different one, and names can collide. Disable prepared statements in your driver, or use session mode or a direct connection. Which driver raises the error?",
+  "text": "**Short answer:** your driver is creating named prepared statements, and transaction mode can't keep them tied to your client. Supabase documents prepared statements as unsupported in transaction mode (port 6543) [1]. Prisma's troubleshooting page lists this exact error as a symptom [2].\n\n**Mechanism** (inferred from the docs below and standard PostgreSQL behaviour; the sources don't spell out every step):\n\n- A prepared statement lives on one server-side Postgres connection. It is session state, not client state.\n- In transaction mode, the pooler returns the connection to the pool after each transaction [1]. Your next transaction can land on a different backend connection, and so can any other client's.\n- Drivers such as Prisma create prepared statements in the background [2]. If two clients reuse the same statement name on the same backend connection, you get `prepared statement \"…\" already exists`.\n- The same mismatch can produce the opposite error, `prepared statement \"…\" does not exist`. Your driver thinks the statement is there, but the query ran on a backend connection that never saw it.\n\nThe diagram below is illustrative. It shows the inferred sequence, not captured logs.\n\n```mermaid\nsequenceDiagram\n  participant A as Client A\n  participant B as Client B\n  participant P as Pooler (transaction mode)\n  participant S as Backend connection 1\n  A->>P: PREPARE s0 + execute\n  P->>S: forwarded\n  Note over P,S: A's transaction ends, S returns to pool\n  B->>P: PREPARE s0 + execute\n  P->>S: forwarded (same backend)\n  S-->>B: ERROR: prepared statement \"s0\" already exists\n```\n\n**Fixes**, in order of preference:\n\n1. **Keep transaction mode and turn off prepared statements in the driver.** The documented settings [1]:\n\n   | Driver | Setting |\n   |---|---|\n   | Postgres.js, Drizzle | `prepare: false` |\n   | Prisma | `pgbouncer=true` on the connection string |\n   | asyncpg | `statement_cache_size=0` |\n   | JDBC | `prepareThreshold=0` |\n\n   For node-postgres, Psycopg and Rust drivers, see Supabase's \"Disabling prepared statements\" guide [5].\n\n2. **Switch to session mode or a direct connection.** The Supavisor FAQ says session mode supports prepared statements, unlike transaction mode [3]. The connection docs say direct connections and session mode support all four transaction-mode limitations [1]. Session mode holds a backend connection per client, so you give up the connection-multiplexing benefit.\n\n**Two caveats:**\n\n- **Version difference:** the older KB article on this error talks about PgBouncer and says to use port 5432 [4]. The current connection docs describe Supavisor transaction mode on 6543 [1]. The current docs take precedence. The older article is consistent on the core point that prepared statements fail in transaction mode.\n- **Pipelining:** `postgres.js` pipelines queries by default, which can hang queries or return mismatched rows in transaction mode [1]. If you use it, `prepare: false` may not be the only change you need.\n\n**Optional check you can run yourself.** Connect through the transaction pooler (port 6543) and run this twice, in two separate connections or transactions:\n\n```sql\nselect name, statement from pg_prepared_statements;\n```\n\nPrepared statements are per-session, so I'd expect this view to show only statements created on the backend connection your transaction landed on. That is an expectation from the mechanism above, not observed output. If you paste the redacted result, we can compare it with your driver's statement names.\n\nI don't know your driver, your connection string, or the exact error text yet, so I can't say which fix applies to you.\n\nWhich driver or ORM is raising the error, and what is the exact statement name in the message (for example `s0`, `s1`, or a longer generated name)?",
+  "diagrams": [
+   {
+    "id": "d1",
+    "kind": "sequenceDiagram",
+    "title": "Illustrative: how a prepared statement name can collide in transaction mode",
+    "code": "sequenceDiagram\n  participant A as Client A\n  participant B as Client B\n  participant P as Pooler (transaction mode)\n  participant S as Backend connection 1\n  A->>P: PREPARE s0 + execute\n  P->>S: forwarded\n  Note over P,S: A's transaction ends, S returns to pool\n  B->>P: PREPARE s0 + execute\n  P->>S: forwarded (same backend)\n  S-->>B: ERROR: prepared statement s0 already exists"
+   }
+  ],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/connecting-to-postgres.md#transaction-mode-limitations",
+    "title": "Connect to your database: Transaction mode limitations",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:46.793099+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/prisma/prisma-troubleshooting.md#prepared-statement-already-exists",
+    "title": "Troubleshooting prisma errors: Prepared statement already exists",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:30.022205+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI.md#supavisor-transaction-mode-vs-session-mode",
+    "title": "Supavisor FAQ: Transaction mode vs. Session mode?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:29.721925+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/troubleshooting/error-prepared-statement-xxx-already-exists-3laqeM.md#error-prepared-statement-xxx-already-exists",
+    "title": "Error: prepared statement \"XXX\" already exists",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:16.302788+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/troubleshooting/disabling-prepared-statements-qL8lEL.md#how-to-disable-prepared-statements-for-supavisor-in-transaction-mode",
+    "title": "Disabling Prepared statements",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:30.167100+00:00"
+   }
+  ],
+  "next_question": "Which driver or ORM is raising the error, and what is the exact statement name in the message (for example s0, s1, or a longer generated name)?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "prepared statements and transaction-mode pooling"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "prepared statement already exists transaction pooler",
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Supavisor transaction mode does not support prepared statements",
+    "products": [
+     "database",
+     "platform",
+     "kb"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 5729,
+  "cache_creation_input_tokens": 97600,
+  "cache_read_input_tokens": 150478
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

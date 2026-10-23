@@ -1,0 +1,80 @@
+{
+ "case_id": "g08",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "Use pg_stat_statements, ordered by total_exec_time, or run supabase inspect db outliers. Total time is cumulative since the last reset, so compare it with calls and mean time. Suppose the top row has two calls and ninety seconds total. Which column tells you whether that's a steady load or a one-off?",
+  "text": "Use `pg_stat_statements`. Supabase projects come with it installed. It tracks planning and execution statistics for all statements [1]. The view has one row per normalized query, identified by `queryid`, and it includes `calls`, `total_exec_time` and `mean_exec_time` [2].\n\n## Option 1: SQL (works locally and hosted)\n\nRead-only. It needs permission to read `pg_stat_statements`. The `postgres` role in the SQL editor or a local connection is enough.\n\n```sql\nselect\n  queryid,\n  calls,\n  round(total_exec_time::numeric, 1) as total_ms,\n  round(mean_exec_time::numeric, 2)  as mean_ms,\n  round(max_exec_time::numeric, 1)   as max_ms,\n  round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 1) as pct_of_total,\n  left(query, 120) as query\nfrom pg_stat_statements\nwhere dbid = (select oid from pg_database where datname = current_database())\norder by total_exec_time desc\nlimit 20;\n```\n\nThe `where` clause restricts the rows to the current database. The `order by total_exec_time desc` clause ranks queries by cumulative time. The Supabase docs use the same columns, `calls`, `mean_exec_time`, `max_exec_time` and `total_exec_time`, in their example [1].\n\n## Option 2: CLI\n\n```sh\nsupabase inspect db outliers --local\n```\n\nThe CLI reference says this lists statements ordered by aggregate execution time. It also shows each statement's proportion of total execution time, its call count and its synchronous I/O time [3]. Use `--local` for the local stack. For a linked hosted project, check `supabase inspect db --help` first. I did not verify the flag set for hosted use this turn.\n\n## How to read the result\n\n- **Total time is not the same as slowness.** A 5 ms query called 100,000 times costs more in total than a 2 s query called 10 times. Compare `calls`, `mean_ms` and `max_ms` together. The CLI docs make the same point: a high total with a low call count is worth investigating, and so is a high share of time spent on I/O [3].\n- **Counters are cumulative since the last reset.** Check `pg_stat_statements_info.stats_reset` and `dealloc`. The Supabase observability docs say to discard comparisons after an upgrade, a reset or entry eviction. They also say the top 100 rows are a sample, not full coverage, and that you should not reset statistics just to collect a baseline [4]. For \"what changed recently\", save snapshots and compare the deltas [4].\n- **Execution time is not CPU time.** It includes waiting on I/O and locks. This view alone does not show which resource is the bottleneck.\n- **The next step is `EXPLAIN`.** Take the top candidates and inspect their plans [4]. On production, use plain `EXPLAIN` first. `EXPLAIN ANALYZE` actually executes the query.\n\nSources:\n[1] https://supabase.com/docs/guides/database/extensions/pg_stat_statements.md#inspecting-activity (tier 1, fetched 2026-10-21)\n[2] https://supabase.com/docs/guides/database/extensions/pg_stat_statements.md#pg-stat-statements-query-performance-monitoring (tier 1, fetched 2026-10-21)\n[3] https://supabase.com/llms/cli.txt#show-queries-from-pg-stat-statements-ordered-by-total-execution-time (tier 1, fetched 2026-10-21)\n[4] https://supabase.com/docs/guides/observability/detecting.md#compare-query-execution-time (tier 1, fetched 2026-10-21)\n\nSuppose the top row has `calls = 2`, `total_ms = 90,000` and `pct_of_total = 40`. Which column would you check next to decide whether that is a steady load problem or a one-off, such as a manual export?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/extensions/pg_stat_statements.md#inspecting-activity",
+    "title": "pg_stat_statements: Inspecting activity",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:28.577821+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/extensions/pg_stat_statements.md#pg-stat-statements-query-performance-monitoring",
+    "title": "pg_stat_statements: Query Performance Monitoring",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:28.577821+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/llms/cli.txt#show-queries-from-pg-stat-statements-ordered-by-total-execution-time",
+    "title": "Show queries from pg_stat_statements ordered by total execution time",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:40.988705+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/observability/detecting.md#compare-query-execution-time",
+    "title": "Compare query execution time",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:26.222290+00:00"
+   }
+  ],
+  "next_question": "Suppose the top row has calls = 2, total_ms = 90,000 and pct_of_total = 40. Which column would you check next to decide whether that is a steady load problem or a one-off, such as a manual export?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "pg_stat_statements triage"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "pg_stat_statements most total execution time slow queries",
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "supabase inspect db outliers command",
+    "products": [
+     "cli"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2305,
+  "cache_creation_input_tokens": 7003,
+  "cache_read_input_tokens": 37313
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

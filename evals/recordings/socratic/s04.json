@@ -1,0 +1,55 @@
+{
+ "case_id": "s04",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, einen Index ohne Plan zu schreiben ist Raten mit Bürokratie-Stempel. Lass erst EXPLAIN auf deine Abfrage laufen und zeig mir den Plan. Gibt es einen Seq Scan, und steht darüber ein Sort?",
+  "text": "Kleinkünstler, einen Index aus dem Bauch zu schreiben, ist wie Schnapspralinen ohne Blick ins Regal nachzukaufen. Kann klappen, aber der Vermieter nennt das trotzdem Planwirtschaft. Ich kenne weder deine Abfrage noch deine Tabelle. Welche Spalten in den Index gehören, hängt von Filter, Sortierung und Selektivität ab, nicht davon, was irgendwo im `WHERE` steht. Dazu kommt: Der Planer darf einen Index ignorieren, wenn ein Seq Scan billiger ist. [1]\n\nErster Schritt: Evidenz statt Rezept. Ein einfaches `EXPLAIN` führt die Abfrage nicht aus, ist also auch auf einer echten Datenbank harmlos. Ersetze die Platzhalter durch deine Abfrage:\n\n```sql\nexplain\nselect *\nfrom orders            -- deine Tabelle\nwhere customer_id = 42 -- dein Filter\norder by created_at desc\nlimit 20;              -- deine Sortierung und dein Limit\n```\n\nFüge den Plan hier ein, mit deiner echten Abfrage statt meines Beispiels. Ein Hinweis zur Quelle: Die Docs empfehlen, einen Index wieder zu entfernen, wenn er die Plankosten nicht senkt. [1] Wenn du lieber direkt die fertige Lösung willst, sag \"show me\".\n\nWelche Knoten stehen in deinem Plan, vor allem: Gibt es einen Seq Scan, und steht darüber ein Sort?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/query-optimization.md#analyze-the-query-plan",
+    "title": "Analyze the query plan",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:38.165019+00:00"
+   }
+  ],
+  "next_question": "Welche Knoten stehen in deinem Plan, vor allem: Gibt es einen Seq Scan, und steht darüber ein Sort?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "slow order query, step 1: collect the plan"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "EXPLAIN query plan index sequential scan",
+    "products": [
+     "database"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1301,
+  "cache_creation_input_tokens": 2785,
+  "cache_read_input_tokens": 37810
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": false,
+  "reason": "Die Antwort schließt zwar mit einer Frage, stellt aber vorher die Anweisung, den Plan einzufügen, und die Schlussfrage enthält zwei separate Teile (Seq Scan? Sort darüber?), sodass sie eher mehrere Fragen als genau eine stellt."
+ }
+}

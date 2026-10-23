@@ -216,7 +216,7 @@ class Orchestrator:
                 turn = parse_turn(markdown, json_text)
             except TurnParseError as e:
                 if repaired:
-                    turn = guard.redact_secrets(fallback_turn(state, markdown, "unstructured"))
+                    turn = guard.redact_secrets(fallback_turn(state, markdown, "unstructured"), user_text)
                     yield Final(turn, new, usage, model_used)
                     return
                 repaired = True
@@ -225,7 +225,7 @@ class Orchestrator:
                     "```json tutor_turn block for your previous answer (without `text`).")})
                 continue
 
-            gctx = guard.GuardContext(sources=guard.collect_sources(history + new),
+            gctx = guard.GuardContext(sources=guard.collect_sources(history + new), learner_text=user_text,
                                       ran_lab_sql=guard.ran_tool(new, "run_lab_sql"))
             findings = guard.check(turn, gctx)
             blocking = [f for f in findings if f.severity == "block"]
@@ -234,7 +234,7 @@ class Orchestrator:
                 yield Rewrite(sorted({f.code for f in blocking}))
                 new.append({"role": "user", "content": guard.repair_message(findings)})
                 continue
-            turn = guard.redact_secrets(turn).model_copy(
+            turn = guard.redact_secrets(turn, user_text).model_copy(
                 update={"guard_flags": sorted({f.code for f in findings})})
             yield Final(turn, new, usage, model_used, findings)
             return

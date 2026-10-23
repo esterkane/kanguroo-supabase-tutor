@@ -1,0 +1,77 @@
+{
+ "case_id": "s13",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, hier ist der Befehl: pg_stat_statements nach total_exec_time absteigend sortiert. Das ist kumulierte Zeit, keine CPU-Zeit, und die Zähler hängen vom letzten Reset ab. Im Lab ist die Extension nicht installiert. Welche Spalte zeigt dir, ob eine Abfrage selten und langsam oder oft und winzig ist?",
+  "text": "Kleinkünstler, du hast \"show me\" gesagt, also gibt es den kompletten Befehl. Er ist die Dienstanweisung der Datenbank: Sie notiert jede Anfrage, und wir sortieren die Akten nach Gesamtaufwand. Das ist das Gegenteil von Bürokratie, denn man liest die Akten tatsächlich.\n\n```sql\nselect\n  queryid,\n  calls,\n  round(total_exec_time::numeric, 2) as total_ms,\n  round(mean_exec_time::numeric, 2)  as mean_ms,\n  rows,\n  left(query, 80)                    as query\nfrom pg_stat_statements\nwhere dbid = (select oid from pg_database where datname = current_database())\norder by total_exec_time desc\nlimit 10;\n```\n\n**Was das tut:** Es ist rein lesend. `total_exec_time` ist die kumulierte Ausführungszeit in Millisekunden, also `calls × Durchschnitt`. Die Supabase-Doku sortiert in ihrem Beispiel genauso nach `total_exec_time desc` [1]. Die Spalten stehen in der Doku-Tabelle [2]. Ab welcher Postgres-Version die Spalte so heißt, habe ich nicht verifiziert. Prüfe es in der PostgreSQL-Doku zu `pg_stat_statements` für deine Version.\n\n**Was es nicht beweist:**\n- Ausführungszeit ist nicht CPU-Zeit.\n- Die Zähler laufen seit dem letzten Reset. Nach einem Reset oder Upgrade sind Vergleiche wertlos [1].\n- Der `limit` liefert eine Stichprobe, keine vollständige Abdeckung [1].\n\n**Lab-Befund:** Ich habe es in der Lab-Datenbank versucht. Die Abfrage scheiterte mit `42P01`, und `pg_extension` zeigt, dass `pg_stat_statements` dort **nicht installiert** ist. Ich kann dir also keine echten Zahlen zeigen. Du müsstest die Extension erst aktivieren (`create extension pg_stat_statements;`). Auf Supabase liegt sie üblicherweise im Schema `extensions`, aber das ist hier ungeprüft.\n\nKleinkünstler, welche Spalte würdest du als Nächstes neben `total_ms` anschauen, um zu unterscheiden, ob eine Abfrage selten und langsam oder oft und winzig ist?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/observability/detecting.md#compare-query-execution-time",
+    "title": "Compare query execution time",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:26.222290+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/extensions/pg_stat_statements.md#pg-stat-statements-query-performance-monitoring",
+    "title": "pg_stat_statements: Query Performance Monitoring",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:28.577821+00:00"
+   }
+  ],
+  "next_question": "Welche Spalte würdest du als Nächstes neben total_ms anschauen, um zu unterscheiden, ob eine Abfrage selten und langsam oder oft und winzig ist?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "pg_stat_statements: cumulative time vs single slow query"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "pg_stat_statements total_exec_time order by",
+    "products": [
+     "database",
+     "observability"
+    ],
+    "k": 4
+   }
+  },
+  {
+   "name": "run_lab_sql",
+   "input": {
+    "sql": "select query, calls, round(total_exec_time::numeric, 2) as total_ms, round(mean_exec_time::numeric, 2) as mean_ms, rows from extensions.pg_stat_statements order by total_exec_time desc limit 5;",
+    "role": "postgres"
+   }
+  },
+  {
+   "name": "run_lab_sql",
+   "input": {
+    "sql": "select extname, extnamespace::regnamespace from pg_extension where extname = 'pg_stat_statements';",
+    "role": "postgres"
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 10,
+  "output_tokens": 3472,
+  "cache_creation_input_tokens": 5517,
+  "cache_read_input_tokens": 82463
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": true,
+  "reason": "Der Lernende sagte ausdrücklich \"show me\", daher ist die vollständige Lösung erlaubt, und die Antwort endet mit genau einer beantwortbaren Frage (welche Spalte neben total_ms) ohne sie selbst zu beantworten."
+ }
+}

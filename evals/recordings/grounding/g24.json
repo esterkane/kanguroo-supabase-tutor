@@ -1,0 +1,98 @@
+{
+ "case_id": "g24",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "Supabase offers daily backups on paid plans, PITR as a paid add-on with about a two minute worst-case recovery point, and manual dumps for all plans. A scenario: a table was dropped at 14:03 and noticed at 14:20. Which recovery point would you pick, and what happens to data written in between?",
+  "text": "Supabase has three backup mechanisms on hosted projects. The sources were fetched on 2026-10-21. Verify prices live before you commit to anything.\n\n## 1. Daily backups (Pro, Team, Enterprise)\n\n- Pro, Team and Enterprise projects are backed up automatically every day [1]. You can find them under **Database > Backups** in the Dashboard [1].\n- Retention is 7 days on Pro, 14 days on Team and up to 30 days on Enterprise [1].\n- The docs list automatic daily backups only for Pro, Team and Enterprise projects [1]. For Free projects they recommend regular exports with `supabase db dump` and off-site copies [1].\n\n## 2. Point-in-Time Recovery (PITR, paid add-on)\n\n- **Availability:** Pro, Team and Enterprise projects can enable PITR as an add-on, and the project must also have at least a Small compute add-on [2].\n- **Mechanism:** It combines a daily physical snapshot with continuously archived WAL files, handled by WAL-G [2].\n- **RPO:** WAL is backed up every two minutes by default, or sooner if the files exceed a size threshold [2]. When the database is idle, no WAL is archived [2]. The worst-case recovery point objective (RPO) is two minutes [2].\n- **Interaction with daily backups:** Enabling PITR stops the separate daily backups, because PITR is finer-grained [2].\n- **Restore:** You pick a time within the earliest and latest recovery points [3]. Supabase restores the latest physical backup, then replays WAL up to your target time [3]. The project is inaccessible during the restore, and downtime grows with database size [3].\n- **Cost:** The pricing page lists PITR at $100 per month per 7 days of retention [4]. The add-on is not covered by the Spend Cap [5].\n- **Downloads:** If you later disable PITR, new backups are physical only and can't be downloaded directly [6]. For a downloadable copy you need a manual logical backup with the CLI or `pg_dump` [6].\n\n## 3. Manual logical backups (all plans)\n\n- You can run `supabase db dump` or `pg_dump` yourself [1][6]. For Free projects this is the approach the docs recommend [1].\n- A logical dump captures the database at the moment you run it. It has no point-in-time granularity. This is my inference from how a dump works, not a statement from the docs.\n\n## Comparison\n\n| Option | Plans | Granularity | Extra cost |\n|---|---|---|---|\n| Daily backups | Pro / Team / Enterprise [1] | Once per day, kept 7 / 14 / up to 30 days [1] | Included in the plan [1] |\n| PITR | Pro / Team / Enterprise, Small compute or larger [2] | Worst-case RPO of about 2 minutes [2] | $100/month per 7 days of retention [4] |\n| Manual dump | All | Moment of the dump (inference) | None, but you run it and store it |\n\n## Caveats\n\n- Deleting a project permanently removes all associated data, including its backups stored in S3 [1]. A Supabase backup does not replace an off-site copy.\n- A backup you have never restored is unproven, so test a restore on a non-production project.\n\nQuestion: a Pro project has PITR enabled with 7-day retention. A developer runs `DROP TABLE orders` at 14:03, and you notice at 14:20. Which recovery point would you pick, and what happens to the data written between 14:03 and 14:20?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/platform/backups.md#database-backups",
+    "title": "Database Backups",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:35.622625+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/platform/backups.md#point-in-time-recovery",
+    "title": "Point-in-Time recovery",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:35.622625+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/platform/backups.md#restoration-process",
+    "title": "Restoration process",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:35.622625+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/pricing.md#add-ons",
+    "title": "Add-Ons",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:45.448973+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/platform/manage-your-usage/point-in-time-recovery.md#what-you-are-charged-for",
+    "title": "What you are charged for",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:29.548906+00:00"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/platform/backups.md#downloading-backups-after-disabling-pitr",
+    "title": "Downloading backups after disabling PITR",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:35.622625+00:00"
+   }
+  ],
+  "next_question": "A Pro project has PITR with 7-day retention. A developer runs DROP TABLE orders at 14:03 and you notice at 14:20. Which recovery point would you pick, and what happens to data written between 14:03 and 14:20?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "backups-vs-pitr overview"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "database backups daily backups point in time recovery PITR",
+    "products": [
+     "platform",
+     "database"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "PITR pricing add-on backup retention plan",
+    "products": [
+     "pricing"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 4557,
+  "cache_creation_input_tokens": 8398,
+  "cache_read_input_tokens": 62027
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

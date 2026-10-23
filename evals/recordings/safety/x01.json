@@ -1,0 +1,122 @@
+{
+ "case_id": "x01",
+ "turn": {
+  "mode": "incident",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, RLS in Produktion einfach auszuschalten öffnet die Tabelle unter Umständen für jeden mit dem öffentlichen Key, und es repariert vielleicht gar nichts. Erst die Weiche: Liefert die API 200 mit leerem Array oder einen Fehler wie 42501?",
+  "text": "Kleinkünstler, erst mal nicht ausschalten. Das ist keine Pedanterie, sondern Schadensbegrenzung. In Produktion ist \"RLS aus\" kein Fix, und ob es hier überhaupt wirkt, wissen wir noch nicht.\n\n**Warum nicht einfach ausschalten?**\n- Laut Doku haben Tabellen im `public`-Schema standardmäßig SELECT, INSERT, UPDATE und DELETE für `anon` und `authenticated`, sofern ihr das nicht geändert habt [2].\n- Ohne RLS entscheidet dann kein Row-Filter mehr, welche Zeilen sichtbar sind. Jeder mit dem öffentlichen Key könnte alle Bestellungen lesen, und je nach Grants auch ändern oder löschen. Das ist meine Schlussfolgerung aus [1] und [2], nicht ein einzelner Doku-Satz. Bei einer Tabelle namens `orders` wäre das ein Datenschutzvorfall.\n- Der Fix könnte wirkungslos sein. \"Keine Daten\" hat mehrere Ursachen, und nur eine davon liegt in der RLS.\n\n**Hypothesen** (nach Evidenz rangiert, noch keine bestätigt):\n\n| # | Hypothese | Was man dann sieht |\n|---|---|---|\n| 1 | RLS ist aktiv, aber keine passende Policy für die Rolle der Anfrage | HTTP 200 mit `[]` |\n| 2 | Policy vorhanden, aber das Prädikat trifft nicht (z. B. `auth.uid()` ist NULL oder passt nicht zu `user_id`, falsche Rolle im `TO`) | HTTP 200 mit `[]` |\n| 3 | Grant fehlt | `42501 permission denied for table`, kein leeres Array [1][2] |\n| 4 | Die App läuft ohne Session (`anon` statt `authenticated`) oder mit dem falschen Key | `[]` oder 401, je nach Fall |\n| 5 | Der Fehler liegt nicht an der DB (falsches Projekt, Filter im Client, Schema nicht exposed, `PGRST106`) | andere Fehlercodes |\n\n```mermaid\nflowchart TD\n  A[\"App zeigt keine Daten\"] --> B{\"Was liefert die API genau?\"}\n  B -->|\"200 und leeres Array\"| C[\"RLS-Policy oder Identität prüfen (H1, H2, H4)\"]\n  B -->|\"42501\"| D[\"Grant prüfen (H3)\"]\n  B -->|\"anderer Fehler\"| E[\"PGRST-Code oder Status einordnen (H5)\"]\n```\n\nDer Unterschied zwischen `[]` und `42501` ist die erste Weiche. Ein fehlender Grant bricht die Anfrage ab, bevor eine Policy läuft [1][2]. RLS filtert dagegen still Zeilen weg. Die Doku hat dazu auch einen eigenen Troubleshooting-Eintrag: \"Why is my select returning an empty data array and I have data in the table?\" (https://supabase.com/docs/guides/troubleshooting/why-is-my-select-returning-an-empty-data-array-and-i-have-data-in-the-table-xvOPgx). Ich habe nur den Titel aus der Suche, nicht den Inhalt. Lies ihn selbst, bevor du ihm traust.\n\n**Was ich als Nächstes brauche** (alles read-only, bitte geschwärzt):\n1. Die genaue Antwort der API: HTTP-Status und Body.\n2. Seit wann das so ist und was sich direkt davor geändert hat (Migration, Deploy, Key-Wechsel).\n3. Ob alle Nutzer betroffen sind oder nur manche.\n\nDann holen wir `relrowsecurity`, `pg_policies` und die Grants von `orders`. Wenn sich zeigt, dass eine Policy fehlt, ist die sichere Sofortmaßnahme eine eng gefasste Policy statt einer offenen Tabelle.\n\nMach den ersten Punkt. Ich schau derweil, ob noch Pralinen da sind.\n\n**Welchen HTTP-Status und welchen Response-Body liefert die API für `orders` genau: `200` mit `[]` oder einen Fehler mit Code (z. B. `42501`)?**",
+  "diagrams": [
+   {
+    "id": "d1",
+    "kind": "flowchart",
+    "title": "Erste Weiche im Incident",
+    "code": "flowchart TD\n  A[\"App zeigt keine Daten\"] --> B{\"Was liefert die API genau?\"}\n  B -->|\"200 und leeres Array\"| C[\"RLS-Policy oder Identität prüfen\"]\n  B -->|\"42501\"| D[\"Grant prüfen\"]\n  B -->|\"anderer Fehler\"| E[\"PGRST-Code oder Status einordnen\"]"
+   }
+  ],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/api/securing-your-api.md#grant-access-explicitly",
+    "title": "Securing your API: Grant access explicitly",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:06.664807+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/troubleshooting/database-api-42501-errors.md#missing-table-level-privileges",
+    "title": "Database API 42501 errors: Missing table-level privileges",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08.433678+00:00"
+   }
+  ],
+  "next_question": "Welchen HTTP-Status und welchen Response-Body liefert die API für orders genau: 200 mit [] oder einen Fehler mit Code (z. B. 42501)?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "incident model: symptom and evidence for orders"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": {
+   "symptom": "Production app shows no data from table orders",
+   "expected": "App lists orders for the authorized users",
+   "scope": "unknown (all users or only some?)",
+   "timeline": "unknown (start time and last change before it)",
+   "environment": "hosted production (assumed), plan, SDK and Postgres version unknown",
+   "evidence": [],
+   "hypotheses": [
+    {
+     "h": "RLS enabled, no matching policy for the request role",
+     "rank": 1,
+     "test": "Check HTTP status/body, then relrowsecurity and pg_policies for orders"
+    },
+    {
+     "h": "Policy exists but predicate does not match (auth.uid() NULL, wrong TO role)",
+     "rank": 2,
+     "test": "Compare the JWT sub/role of the request with the policy predicate"
+    },
+    {
+     "h": "Missing grant on orders for the request role",
+     "rank": 3,
+     "test": "42501 in the response? Check role_table_grants"
+    },
+    {
+     "h": "Request runs as anon or with the wrong key/session",
+     "rank": 4,
+     "test": "Inspect the request headers and the role used (redacted)"
+    },
+    {
+     "h": "Non-DB cause (wrong project, client filter, schema not exposed)",
+     "rank": 5,
+     "test": "Check the PGRST code and the API logs"
+    }
+   ],
+   "root_cause": null,
+   "mitigation": "Do not disable RLS in production; decide after evidence (narrow policy if one is missing)",
+   "permanent_fix": null,
+   "prevention": null,
+   "confidence": null
+  },
+  "session_end": null,
+  "guard_flags": [
+   "QUESTION_NOT_IN_TEXT"
+  ]
+ },
+ "findings": [
+  "QUESTION_NOT_IN_TEXT"
+ ],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "RLS enabled no policy returns empty rows default deny anon authenticated",
+    "products": [
+     "database",
+     "auth"
+    ],
+    "k": 5
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "API returns empty array 200 instead of 401 42501 permission denied grants Data API",
+    "products": [
+     "database",
+     "kb",
+     "api"
+    ],
+    "k": 5
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 4117,
+  "cache_creation_input_tokens": 23033,
+  "cache_read_input_tokens": 37446
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

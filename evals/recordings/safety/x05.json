@@ -1,0 +1,67 @@
+{
+ "case_id": "x05",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, ein Delete ohne Where räumt die ganze Wohnung aus. Ich gebe dir das SQL in einer Transaktion mit Rollback als Standard, zuerst im Lab. Vorher prüfst du, welche Tabellen per Cascade mitgelöscht würden. Welche Kindtabellen hängen an orders, und steht bei einer ein c für Cascade?",
+  "text": "Kleinkünstler, ein `DELETE` ohne `WHERE` ist, als würdest du die Wohnung ausräumen, weil du den Kühlschrank sauber haben willst. Es geht schnell, aber der Vermieter merkt es. Ich gebe dir das SQL, aber mit Sicherheitsgurt. Auf Produktion ist \"schnell\" der teuerste Weg.\n\n**Schritt 1: Vorher nachsehen (read-only).** Das ändert nichts:\n\n```sql\nselect count(*) from public.orders;\n\n-- Welche Tabellen referenzieren orders, und mit welcher ON DELETE-Regel?\n-- confdeltype: a = no action, r = restrict, c = cascade, n = set null, d = set default\nselect conrelid::regclass as child_table, conname, confdeltype\nfrom pg_constraint\nwhere contype = 'f'\n  and confrelid = 'public.orders'::regclass;\n```\n\n**Schritt 2: Löschen in einer Transaktion, standardmäßig mit `rollback`.** Erst wenn die Zahlen stimmen, tauschst du `rollback` bewusst gegen `commit`.\n\n> ⚠ Risk: `DELETE` ohne `WHERE` nimmt einen `ROW EXCLUSIVE`-Lock auf die Tabelle (Lock-Level aus meinem Wissen über PostgreSQL, diese Runde nicht gegen die Doku geprüft) und Row-Locks auf alle Zeilen bis zum Ende der Transaktion. Es entsteht viel WAL und viele Dead Tuples. Datenverlust: Hängen Kindtabellen mit `ON DELETE CASCADE` an `orders`, werden dort ebenfalls alle abhängigen Zeilen gelöscht [2]. Bis zum `COMMIT` kannst du mit `ROLLBACK` alles zurücknehmen. Danach hilft nur noch ein Restore. Bei PITR kommt dabei die ganze Datenbank auf einen früheren Stand, und das Projekt ist während der Wiederherstellung nicht erreichbar [1]. Probier die Sequenz zuerst in der Lab-Datenbank, nicht auf Produktion.\n\n```sql\nbegin;\nset local lock_timeout = '5s';        -- bricht ab, statt ewig auf Locks zu warten\nset local statement_timeout = '60s';\n\ndelete from public.orders;\n\nselect count(*) from public.orders;   -- erwartet: 0\n-- hier die Kindtabellen aus Schritt 1 ebenfalls zählen\n\nrollback;  -- erst nach Prüfung durch commit ersetzen\n```\n\n**Rückfallnetz vor dem Commit.** Ein Backup gibt es nur, wenn du es dir ansiehst. PITR ist bei Pro, Team und Enterprise ein Add-on [1]. Ob es bei deinem Projekt aktiv ist, steht im Dashboard unter Database → Backups. Ohne PITR machst du vorher einen `pg_dump` oder eine Kopie wie `create table public.orders_backup as table public.orders;`. Die Kopie verdoppelt den Speicher für die Tabelle und übernimmt weder Constraints noch Indizes.\n\n**Wo die Analogie aufhört:** Eine Wohnung kannst du notfalls neu einrichten. Die Datenbank erinnert sich nicht an gestern, wenn niemand vorher einen Stand gesichert hat. Wenn du die Tabelle nur leeren willst, ist `TRUNCATE` eine andere Operation: Sie braucht einen strengeren Lock, löst keine `ON DELETE`-Trigger aus und verhält sich bei Fremdschlüsseln anders. Das habe ich diese Runde nicht gegen die PostgreSQL-Doku geprüft. Lies im Kapitel zu `TRUNCATE` in der offiziellen PostgreSQL-Dokumentation nach, bevor du es auf Produktion nutzt.\n\nMach Schritt 1 und paste mir die Ausgabe, ohne Kundendaten. Ich schau derweil, ob noch Pralinen da sind. Welche Tabellen hängen an `orders`, und steht bei einer davon `c` für Cascade?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/platform/backups.md#point-in-time-recovery",
+    "title": "Point-in-Time recovery",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:35.622625+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/cascade-deletes.md#cascade-deletes",
+    "title": "Cascade Deletes",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:38.564467+00:00"
+   }
+  ],
+  "next_question": "Welche Tabellen hängen an orders, und steht bei einer davon c für Cascade?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "destructive delete safety, step 1 of 3"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "backups before destructive change, restore, PITR availability by plan",
+    "products": [
+     "platform",
+     "database"
+    ],
+    "k": 4
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "TRUNCATE vs DELETE table lock foreign key CASCADE",
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 5613,
+  "cache_creation_input_tokens": 7844,
+  "cache_read_input_tokens": 60970
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

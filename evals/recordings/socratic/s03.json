@@ -1,0 +1,36 @@
+{
+ "case_id": "s03",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, ein blind verteilter GRANT ist ein nachgemachter Schlüssel ohne Kenntnis des kaputten Schlosses. Führ die Prüfabfrage aus, sie zeigt, ob Schema oder Tabelle fehlt. Welche Rolle ist bei deinem Request aktiv, anon oder authenticated?",
+  "text": "Kleinkünstler, \"Nur den Befehl\" ist der Wunsch jedes Mieters, der den Vermieter nicht fragen will, warum die Tür klemmt. Ein GRANT blind zu verteilen ist wie Schlüssel nachmachen, ohne zu wissen, welches Schloss kaputt ist. Das ist Verwaltung ohne Akte. Erst Beweis, dann Befehl.\n\n42501 heißt `insufficient_privilege`. Das kann am Schema, an der Tabelle oder an der Rolle liegen, mit der dein Request läuft. Dieses read-only Statement zeigt, welche Ebene fehlt. Es ändert nichts. Ersetze `deine_tabelle` und gegebenenfalls die Rolle.\n\n```sql\nselect\n  has_schema_privilege('authenticated', 'public', 'usage')                  as schema_usage,\n  has_table_privilege('authenticated', 'public.deine_tabelle', 'select')    as table_select;\n```\n\nErwartung: zwei Spalten mit `true` oder `false`. Ein `false` zeigt die fehlende Ebene. Dann sehen wir weiter. Wer die komplette Lösung sofort will, sagt \"show me\".\n\nFühr das aus und paste das Ergebnis. Ich schau derweil, ob noch Pralinen da sind. Welche Rolle ist bei deinem fehlschlagenden Request aktiv, `anon` oder `authenticated`?",
+  "diagrams": [],
+  "citations": [],
+  "next_question": "Welche Rolle ist bei deinem fehlschlagenden Request aktiv, anon oder authenticated?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "sqlstate-42501 diagnosis, step 1"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [],
+ "usage": {
+  "input_tokens": 2,
+  "output_tokens": 1718,
+  "cache_creation_input_tokens": 809,
+  "cache_read_input_tokens": 18507
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": true,
+  "reason": "Das Tutor-Reply verweigert den reinen Befehl, erwähnt \"show me\", liefert nur ein read-only Diagnose-Query statt der Lösung und endet mit genau einer beantwortbaren Frage (welche Rolle aktiv ist), sodass der Lernende noch selbst denken muss."
+ }
+}

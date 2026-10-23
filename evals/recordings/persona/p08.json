@@ -1,0 +1,116 @@
+{
+ "case_id": "p08",
+ "turn": {
+  "mode": "lesson",
+  "language": "en",
+  "persona_on": true,
+  "speech": "Kleinkünstler, a Postgres role is a card holder in the house system. With login it acts like a user, without login like a group that holds permissions. Question: if a role named reader has no LOGIN but has SELECT on a table, can a client connect as reader, and is it still useful?",
+  "text": "Kleinkünstler, I'm the Känguru. I live here rent-free, and I'll be teaching you to debug Supabase and PostgreSQL like a support engineer. Plan: baseline case, check your macOS prerequisites, start a disposable CLI lab, then trace one request from client to PostgREST to Postgres to GRANT to RLS to table. First, your question.\n\nThink of the WG as a house with one key-card system. A role is a card holder on that system. The same card type can be a person (Alice, who can open the front door) or a function (\"the cleaning rota\", who can't open the door but whose permissions get handed to whoever joins). Where this stops being valid: real keys don't nest. Postgres roles can be members of other roles, and the member can inherit privileges.\n\nTechnically, Postgres has one concept, the role. A role with login privileges works as a \"user\". A role without login works as a \"group\" that holds permissions for several users [1]. Roles can be granted privileges like `SELECT`, `INSERT`, `UPDATE` and `DELETE` on tables, views, functions and other objects through `GRANT` [2]. Supabase's docs also say these roles mostly configure system access, while application access should go through Row Level Security [3].\n\nSupabase uses a few roles you'll meet constantly:\n\n| Role | What the docs say it is for |\n|---|---|\n| `anon` | Unauthenticated access. PostgREST uses it when the user is not signed in [4]. |\n| `authenticated` | Signed-in access [5]. |\n| `service_role` | Elevated access. PostgREST uses it to bypass RLS [6]. Never expose it client-side [7]. |\n| `postgres` | The default admin role [8]. |\n\nI haven't run anything yet. In the lab we'll look at `pg_roles` with real output, not my description of it.\n\nHere is your first task. Suppose a role named `reader` is created with no `LOGIN` attribute, and it has `SELECT` on a table. Can a client connect to the database as `reader`? Could the role still be useful? Answer both, and take your time. I'll go check whether the pralinen are still there.",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/roles.md#users-vs-roles",
+    "title": "Users vs roles",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08.087404+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/roles.md#granting-permissions",
+    "title": "Granting permissions",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08.087404+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/database/postgres/roles.md#postgres-roles",
+    "title": "Postgres Roles",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08.087404+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/database/postgres/roles.md#anon",
+    "title": "anon",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08.087404+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/database/postgres/roles.md#authenticated",
+    "title": "authenticated",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08.087404+00:00"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/database/postgres/roles.md#service-role",
+    "title": "service_role",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08.087404+00:00"
+   },
+   {
+    "n": 7,
+    "url": "https://supabase.com/docs/guides/queues/quickstart.md#grant-permissions-to-pgmq-public-database-functions",
+    "title": "Grant permissions to pgmq_public database functions",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:40.475764+00:00"
+   },
+   {
+    "n": 8,
+    "url": "https://supabase.com/docs/guides/database/postgres/roles.md#postgres",
+    "title": "postgres",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08.087404+00:00"
+   }
+  ],
+  "next_question": "If a role named reader has no LOGIN attribute but has SELECT on a table, can a client connect as reader, and could the role still be useful?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "roles baseline, step 1 of 5"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": [
+   "CITATION_UNUSED"
+  ]
+ },
+ "findings": [
+  "CITATION_UNUSED"
+ ],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "PostgreSQL roles: users and groups, LOGIN attribute, privileges, membership",
+    "products": [
+     "database"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Supabase postgres roles anon authenticated service_role",
+    "products": [
+     "database",
+     "auth"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2305,
+  "cache_creation_input_tokens": 4515,
+  "cache_read_input_tokens": 37413
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

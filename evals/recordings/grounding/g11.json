@@ -1,0 +1,93 @@
+{
+ "case_id": "g11",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, die Postgres-Version ist das Baujahr des Hauses. Du kannst im Dashboard unter Project Settings, General nachsehen oder im SQL Editor show server_version ausführen. Läuft dein Projekt gehostet oder lokal, und was liefert die Abfrage?",
+  "text": "Kleinkünstler, die Postgres-Version ist so etwas wie das Baujahr des Hauses. Du kannst den Vermieter fragen (Dashboard) oder selbst nachsehen (SQL). Beides führt zum selben Haus. Bei der Bürokratie gibt es dagegen oft drei Formulare für dieselbe Auskunft.\n\n**Technisch gibt es zwei belegte Wege (hosted):**\n\n1. **SQL.** Führe im SQL Editor des Dashboards oder per `psql` über eine direkte Verbindung diesen Befehl aus: [1]\n\n   ```sql\n   show server_version;\n   ```\n\n   Die Doku nennt als Beispielausgabe `15.1`. Das ist ein Beispielwert und sagt nichts über dein Projekt. [1]\n\n2. **Dashboard.** Unter [Project Settings > General](https://supabase.com/dashboard/project/_/settings/general) steht die Postgres-Version. Eine Troubleshooting-Seite verweist für genau diesen Zweck darauf. [3] Dort sitzt auch der Button \"Upgrade project\". [2]\n\n**Lokal (CLI-Stack):** Der Docs-Treffer dazu betrifft nur `db.major_version` in `supabase/config.toml`. Für mehrere lokale Projekte werden dort nur die Werte 15 und 17 unterstützt. [4] Welche Version dein laufender lokaler Container tatsächlich hat, belegt aber erst `show server_version;` gegen die lokale Datenbank.\n\nZwei Einschränkungen:\n\n- **Versionsformat:** Die Restore-Doku nennt als Beispiel eine Supabase-Postgres-Version wie `15.6.1.115`. [5] Das ist ein anderes Format als die `15.1` aus `server_version`. Ich habe nicht geprüft, wo genau das Dashboard welche Form anzeigt. Wenn du beide Werte hast, vergleiche sie nicht blind.\n- **Aktualität:** Die Docs-Seiten wurden am 2026-10-21 abgerufen. Das Dashboard-Layout kann sich ändern, die SQL-Abfrage bleibt davon unberührt.\n\nMach das. Ich schaue derweil, ob noch Pralinen da sind. Läuft dein Projekt gehostet oder lokal, und was liefert `show server_version;` bei dir?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/which-version-of-postgres.md#print-postgres-version",
+    "title": "Print Postgres version",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:48.651711+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/platform/migrating-and-upgrading-projects.md#how-we-upgrade",
+    "title": "Upgrading > How we upgrade",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:52.660919+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/troubleshooting/postgrest-error-400-column-example_tableexample_column-does-not-exist-when-using-or-operators-46ff23.md#how-to-confirm",
+    "title": "PostgREST error: 400 'column ... does not exist' when using OR operators > How to confirm",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:26.155438+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/local-development/running-multiple-local-projects.md#limitations",
+    "title": "Running multiple local projects > Limitations",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:49.379316+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/local-development/restoring-downloaded-backup.md#restoring-your-backup",
+    "title": "Restoring a downloaded backup locally > Restoring your backup",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:39.340081+00:00"
+   }
+  ],
+  "next_question": "Läuft dein Projekt gehostet oder lokal, und was liefert show server_version; bei dir?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "baseline: environment check"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "how to check which Postgres version my project is running",
+    "products": [
+     "database",
+     "platform",
+     "kb"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "supabase local development postgres major_version config.toml db version",
+    "products": [
+     "cli",
+     "local-development"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2828,
+  "cache_creation_input_tokens": 28800,
+  "cache_read_input_tokens": 37430
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

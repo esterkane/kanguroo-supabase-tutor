@@ -1,0 +1,84 @@
+{
+ "case_id": "g26",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "Postgres picks an index only if the query shape matches it and the planner estimates it is cheaper than a sequential scan. Stale statistics can also mislead it. Can you paste the query, the index definition, and the plain EXPLAIN output?",
+  "text": "Postgres decides per query whether an index is worth using. It is never obliged to use one, so \"not used\" has several possible causes. They are listed below in the order I would check them.\n\n**1. The index can't match the query's shape.**\n- The planner considers an index when the indexed column appears in a filter, join or `ORDER BY` with an operator the index supports. [1]\n- A B-tree supports `<`, `<=`, `=`, `>=`, `>`, plus equivalents like `IN` and `BETWEEN`. A GIN index on `jsonb` supports `@>` but not `>`. [1]\n- From general PostgreSQL knowledge, not cited this turn: these are also common shape mismatches.\n  - A function or cast on the column, such as `where lower(email) = ...`.\n  - A type mismatch.\n  - A filter on a non-leading column of a composite index.\n  - A partial index whose predicate the query doesn't imply.\n  - A `LIKE` pattern that starts with `%`.\n\n**2. The planner estimates that a sequential scan is cheaper.**\n- Supabase's docs say the planner may ignore an available index if it expects the query to be faster without it. A small table is the usual example. [2]\n- Low selectivity works the same way. If the filter matches a large share of the table, reading it sequentially beats many random index lookups. This is my addition from general knowledge and is not in the retrieved sources.\n\n**3. The statistics are wrong.**\n- The planner uses table statistics to choose between an index and a full scan. If they drift from reality, it can choose badly. [3]\n- Supabase's docs suggest `analyze <table>;` to refresh them. [3]\n- Estimated and actual row counts in `EXPLAIN ANALYZE` show whether this is the cause.\n- The same page also mentions `pg_stat_reset()`, labelled \"use judiciously\". [1] I would not start there. As I understand it, that function resets cumulative activity counters, not the planner's column statistics. I haven't verified that this turn.\n\n**Tests to run:**\n1. Run `EXPLAIN <your query>`. This plans the query without executing it. [1][4]\n2. Run `analyze <table>;`, then run `EXPLAIN` again. If the plan changes, stale statistics were the cause.\n3. In a disposable or non-production session only, run `set enable_seqscan = off;` and then `EXPLAIN` again. If the index now appears with a higher estimated cost than the sequential scan, the planner was choosing on cost. If it still doesn't appear, the index can't serve this query shape. Run `reset enable_seqscan;` afterwards. This is a diagnostic, not a fix.\n\nAn index that gets used but doesn't lower the plan cost should be removed. [4]\n\nCan you paste the query, the table's index definitions (`\\d tablename` output or the `create index` statement), and the plain `EXPLAIN` output?\n\n[1]: https://supabase.com/docs/guides/troubleshooting/how-postgres-chooses-which-index-to-use-_JHrf4.md#how-an-index-is-chosen\n[2]: https://supabase.com/docs/guides/database/postgres/indexes.md#understanding-index-advisor-results\n[3]: https://supabase.com/docs/guides/database/query-optimization.md#statistics\n[4]: https://supabase.com/docs/guides/database/query-optimization.md#analyze-the-query-plan",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/troubleshooting/how-postgres-chooses-which-index-to-use-_JHrf4.md#how-an-index-is-chosen",
+    "title": "How Postgres chooses which index to use",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:19.708813+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/indexes.md#understanding-index-advisor-results",
+    "title": "Understanding Index Advisor results",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:35.932007+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/database/query-optimization.md#statistics",
+    "title": "Query Optimization: Statistics",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:38.165019+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/database/query-optimization.md#analyze-the-query-plan",
+    "title": "Query Optimization: Analyze the query plan",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:38.165019+00:00"
+   }
+  ],
+  "next_question": "Can you paste the query, the index definitions on the table, and the plain EXPLAIN output?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "index not used: diagnosis"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "why Postgres does not use index sequential scan planner",
+    "products": [
+     "database",
+     "kb"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "query optimization indexes EXPLAIN ANALYZE statistics",
+    "products": [
+     "database"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2388,
+  "cache_creation_input_tokens": 5581,
+  "cache_read_input_tokens": 37309
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

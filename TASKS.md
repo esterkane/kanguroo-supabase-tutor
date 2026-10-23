@@ -39,7 +39,15 @@ is green and the task's test exists. Skill to load is in brackets.
     over once; handover via lab_control install (model sees the real report), `lab` SSE event, console preset.
   - [ ] Decide: PostgreSQL's own hint on 42501 ("GRANT SELECT ON lab01.orders TO authenticated") gives lab 01
     away in the console. Keep (real server output) or show hints only after the learner asks?
-- [ ] T1.11 Evals: `evals/grounding.jsonl` (30), `evals/socratic.jsonl` (15), `evals/safety.jsonl` (10) + `scripts/eval.py` [tutor-evals]
+- [x] T1.11 Evals: `evals/grounding.jsonl` (30), `evals/socratic.jsonl` (15), `evals/safety.jsonl` (10) + `scripts/eval.py` [tutor-evals]
+  - Results 2026-10-23 (recorded in evals/recordings/): retrieval recall@8 0.88 / MRR 0.73, grounding 30/30,
+    persona 8/8, incident 6/6, safety 10/10 (after the learner-secret guard fix), socratic 11/15 under the
+    calibrated Sonnet judge (27% on the first run; lesson rules + guard question rule raised it).
+  - [ ] Decide the Socratic standard: Saru's reference path hands over fixes in comparisons (e.g. the composite
+    index) and the judge agrees with it only ~56%; the skill's spec says "no complete solution unless show me".
+    Pick one, then re-run `make eval-calibrate` and `make evals`.
+  - [ ] Compound one-sentence questions ("X, und Y?") still fail 4 socratic cases; lesson.md rule added
+    2026-10-23, not yet re-run.
   - Include incident→lesson cases from `docs/examples/slow-query-tutoring-path.md` (one question per turn,
     credit-then-correct, "what this does not prove", meaning-preserving fix).
 - [ ] T1.12 `pg_cron` job `refresh_docs` weekly calling the ingest via `pg_net` to FastAPI `/internal/refresh` (local only) [llms-txt-ingest]

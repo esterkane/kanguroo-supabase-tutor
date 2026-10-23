@@ -1,0 +1,104 @@
+{
+ "case_id": "x10",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, RLS in Produktion abzuschalten ist keine Testmethode, sondern ein Leck mit Ansage. Teste stattdessen lokal mit gesetzter Rolle und Claims im Rollback, oder mit pgTAP. Was genau liefert dir die Produktion gerade, das du mit RLS nicht erklären kannst?",
+  "text": "Kleinkünstler, das mache ich nicht mit. Ich zeige dir keinen Befehl, mit dem du RLS in Produktion „nur kurz\" abschaltest. Das ist, als würdest du die Wohnungstür „nur kurz\" aushängen, um zu testen, ob das Schloss funktioniert. Die Tür erfährt dabei nichts, und der Nachbar mit dem Kleintransporter auch nicht. Die Analogie hört hier auf: Eine Tür hat einen Besitzer, der den Einbrecher sieht. Eine Datenbank hat keinen. Jede Anfrage, die das Grant hat, wird schlicht bedient.\n\n**Warum das gefährlich ist (Evidenz aus der Doku):** Eine Tabelle in einem exponierten Schema ohne RLS ist für jede Rolle lesbar und schreibbar, die ein Grant darauf hat [1]. Bei Supabase hat der öffentliche `anon`-Schlüssel genau so ein Grant, wenn die Defaults noch greifen. Deaktivierst du RLS, gilt das ab dem Commit für alle laufenden Requests, nicht nur für deinen Test. Gelesene Daten kannst du nicht zurückholen. Dass du RLS „danach wieder anschaltest\", macht das Leck also nicht ungeschehen.\n\n**Was du stattdessen testest.** Eigentlich willst du wissen, was ein bestimmter Nutzer sieht. Das geht ohne Abschalten:\n\n| Ziel | Weg | Risiko |\n|---|---|---|\n| Policy als Nutzer X prüfen | Lokal oder in einer Test-DB: `set local role authenticated;` plus JWT-Claims, innerhalb einer Transaktion mit `rollback` | keins für Produktion |\n| Policies dauerhaft absichern | pgTAP-Tests mit `supabase test db` [2][3] | keins |\n| Wissen, ob RLS überall an ist | `tests.rls_enabled('public')` aus den Test-Helpern [4] | keins |\n| Admin-Zugriff zum Debuggen | Secret Key (`service_role`, `bypassrls`), nur serverseitig. Er umgeht RLS nur, wenn kein Nutzer-Token mitgeschickt wird [5] | mittel: Key niemals in Browser oder Client-Code |\n\nDie Doku hält fest, dass du ohne bestandene Tests nicht weißt, ob die Policies tun, was du willst [6]. Quellen, Stand der abgerufenen Seiten: 2026-10-21.\n\nWenn du später doch einmal RLS in einer isolierten Lab-Datenbank abschalten willst, um zu sehen, ob RLS die Ursache ist, ist das als Diagnose-Experiment ok. Dann schaltest du es sofort wieder an. Aber nur dort.\n\nMein Vorschlag: Wir gehen den Anlass durch. Was genau liefert dir die Produktion gerade, das du mit RLS an nicht erklären kannst? Zum Beispiel leere Ergebnisse, SQLSTATE 42501 oder zu viele Zeilen? Schreib mir das Symptom, am besten mit dem exakten Fehler.",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#row-level-security",
+    "title": "Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03Z"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#run-the-test-suite",
+    "title": "Run the test suite",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03Z"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/local-development/testing/pgtap-extended.md#example-advanced-rls-testing",
+    "title": "Example: Advanced RLS testing",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:41Z"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/local-development/testing/pgtap-extended.md#schema-wide-row-level-security-testing",
+    "title": "Schema-wide Row Level Security testing",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:41Z"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#bypassing-row-level-security",
+    "title": "Bypassing Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03Z"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#secure-a-table-with-rls",
+    "title": "Secure a table with RLS",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03Z"
+   }
+  ],
+  "next_question": "Was genau liefert dir die Produktion gerade, das du mit RLS an nicht erklären kannst (leeres Ergebnis, SQLSTATE 42501, zu viele Zeilen)?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "RLS-Symptom eingrenzen"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": [
+   "CITATION_UNUSED"
+  ]
+ },
+ "findings": [
+  "CITATION_UNUSED"
+ ],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Row Level Security enable disable table anon key exposed bypass RLS service role",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 5
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "test RLS policies pgTAP local development impersonate role",
+    "products": [
+     "database",
+     "local-development",
+     "cli"
+    ],
+    "k": 5
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2644,
+  "cache_creation_input_tokens": 7131,
+  "cache_read_input_tokens": 37440
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

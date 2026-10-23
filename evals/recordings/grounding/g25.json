@@ -1,0 +1,78 @@
+{
+ "case_id": "g25",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, stell dir vor, der Vermieter tauscht ein Regal, indem er ein neues daneben baut und alles einzeln umräumt. Ob Postgres bei int zu bigint genauso vorgeht, messen wir, statt es zu glauben. Ändert sich der filenode, und woran siehst du es noch?",
+  "text": "Kleinkünstler, stell dir vor, der Vermieter will in der WG ein Regal gegen ein größeres tauschen. Er baut es nicht an Ort und Stelle um. Er stellt ein komplett neues Regal daneben, räumt jedes Teil einzeln um und wirft das alte erst danach raus. Währenddessen steht die Küche unter Verwaltungsaufsicht, also darf keiner rein. Die Analogie hinkt an einer Stelle: Postgres räumt nicht nach Gefühl um, sondern transaktional. Bis zum Commit bleibt das alte Regal gültig.\n\n**Was ich belegen kann und was nicht**\n\n- **Belegt (Tier 1):** Die Supabase-Troubleshooting-Seite sagt, die lange Laufzeit komme von der Größe der Tabelle. Sie empfiehlt als Alternative: neue Spalte anlegen, Werte kopieren, alte Spalte droppen. [1]\n- **Nicht belegt:** Dass `ALTER COLUMN TYPE` die ganze Tabelle neu schreibt, steht dort nicht. Ich habe es auch nicht verifiziert, denn beide Lab-Versuche sind gescheitert. Der erste meldete nur das erste Statement, der zweite wurde vom Runner abgelehnt, weil er Transaktionskontrolle im DO-Block erkannt hat. Die PostgreSQL-Doku (ALTER TABLE, Abschnitt Notes) habe ich diese Runde nicht abgerufen.\n- **Meine Arbeitshypothese (Hintergrundwissen, ungeprüft):** Bei vielen Typwechseln schreibt Postgres die gesamte Tabelle und alle Indizes neu. Währenddessen hält der Befehl vermutlich ein sehr hartes Tabellenlock. Dann ist die Dauer ungefähr proportional zu Tabellengröße plus Indizes, und alle anderen Queries stauen sich dahinter. Genau das müssen wir messen, bevor wir es als Tatsache behandeln.\n\n**Auffälligkeit in der Supabase-Seite:** Der dort gezeigte Schritt 2 ist so, wie er dasteht, rückwärts geschrieben (`SET \"old_column_name\" = \"new_column_name\"::new_data_type`). Richtig wäre vermutlich `SET new = old::new_type`. Außerdem ist ein einziges `UPDATE` über die ganze Tabelle weiterhin eine einzige lange Transaktion. Die Seite verspricht, dass der Ansatz \"prolonged transactions\" vermeidet. Das gilt wohl nur, wenn man den Update in Batches aufteilt. Das ist meine Einschätzung, nicht die Aussage der Seite.\n\n**Experiment für dich (Lab, nichts bleibt zurück)**\n\n> ⚠ Risk: `ALTER TABLE ... TYPE` nimmt vermutlich ein `ACCESS EXCLUSIVE`-Lock (ungeprüft, genau das wollen wir sehen). Nur in der Wegwerf-Datenbank ausführen. Das `rollback` am Ende macht alles rückgängig.\n\n```sql\nbegin;\ncreate table _rw_demo as\n  select g as id, g::int as n from generate_series(1, 100000) g;\n\nselect 'before' as step,\n       pg_relation_filenode('_rw_demo') as filenode,\n       pg_relation_size('_rw_demo') as bytes;\n\nalter table _rw_demo alter column n type bigint;\n\nselect 'after' as step,\n       pg_relation_filenode('_rw_demo') as filenode,\n       pg_relation_size('_rw_demo') as bytes;\nrollback;\n```\n\n`pg_relation_filenode` liefert die Nummer der Datei auf der Platte. Ändert sie sich, hat Postgres die Daten in eine neue Datei geschrieben. Bleibt sie gleich, wurde nur der Katalog angepasst.\n\nBevor du es ausführst, eine Vorhersage: Ändert sich bei `int` → `bigint` der `filenode`, und wenn ja, woran würdest du das in der Ausgabe außer an der Zahl erkennen?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/troubleshooting/slow-execution-of-alter-table-on-large-table-when-changing-column-type-qmZRpZ.md#slow-execution-of-alter-table-on-large-table-when-changing-column-type",
+    "title": "Slow Execution of ALTER TABLE on Large Table when changing column type",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:31.450336Z"
+   }
+  ],
+  "next_question": "Ändert sich bei int zu bigint der filenode, und woran würdest du das in der Ausgabe außer an der Zahl erkennen?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "ALTER TYPE: Rewrite und Locking messen"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "ALTER TABLE ALTER COLUMN TYPE table rewrite ACCESS EXCLUSIVE lock",
+    "products": [
+     "database",
+     "kb"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "run_lab_sql",
+   "input": {
+    "sql": "create table public._rw_demo as select g as id, g::int as n from generate_series(1,100000) g;\ncreate temp table _obs(step text, relfilenode oid, size_bytes bigint);\ninsert into _obs select 'before int->bigint', pg_relation_filenode('public._rw_demo'), pg_relation_size('public._rw_demo');\nalter table public._rw_demo alter column n type bigint;\ninsert into _obs select 'after int->bigint (rewrite)', pg_relation_filenode('public._rw_demo'), pg_relation_size('public._rw_demo');\nalter table public._rw_demo alter column n type bigint;\ninsert into _obs select 'after no-op same type', pg_relation_filenode('public._rw_demo'), pg_relation_size('public._rw_demo');\nselect * from _obs;",
+    "role": "postgres"
+   }
+  },
+  {
+   "name": "run_lab_sql",
+   "input": {
+    "sql": "do $$\ndeclare a oid; b oid; c oid; d oid; sa bigint; sb bigint;\nbegin\n  create table public._rw_demo as select g as id, g::int as n from generate_series(1,100000) g;\n  a := pg_relation_filenode('public._rw_demo'); sa := pg_relation_size('public._rw_demo');\n  alter table public._rw_demo alter column n type bigint;\n  b := pg_relation_filenode('public._rw_demo'); sb := pg_relation_size('public._rw_demo');\n  alter table public._rw_demo alter column n type bigint;\n  c := pg_relation_filenode('public._rw_demo');\n  alter table public._rw_demo alter column n type bigint using n::bigint;\n  d := pg_relation_filenode('public._rw_demo');\n  create table public._rw_demo2 (id int, t varchar(10));\n  insert into public._rw_demo2 select g, 'x' from generate_series(1,1000) g;\n  declare e oid; f oid; begin\n    e := pg_relation_filenode('public._rw_demo2');\n    alter table public._rw_demo2 alter column t type varchar(50);\n    f := pg_relation_filenode('public._rw_demo2');\n    raise exception 'RESULT int->bigint: filenode % -> % (same? %), size % -> %; repeat bigint->bigint same filenode as before? %; again with USING: unchanged? %; varchar(10)->varchar(50) filenode unchanged? %', a, b, a=b, sa, sb, b=c, c=d, e=f;\n  end;\nend $$;",
+    "role": "postgres"
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "PostgreSQL ALTER TABLE rewrite whole table changing column data type binary coercible",
+    "products": [
+     "database",
+     "other"
+    ],
+    "k": 5
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 6,
+  "output_tokens": 4931,
+  "cache_creation_input_tokens": 9316,
+  "cache_read_input_tokens": 61391
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

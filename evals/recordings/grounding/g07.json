@@ -1,0 +1,88 @@
+{
+ "case_id": "g07",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, Session Mode ist der Badschlüssel, den du behältst. Transaction Mode ist der Schlüssel nur für einen Duschgang. Danach ist dein Zustand weg. Was passiert mit einem SET statement_timeout im Transaction Mode beim nächsten, separaten Statement?",
+  "text": "Kleinkünstler, stell dir ein WG-Bad mit wenigen Schlüsseln vor. Im **Session Mode** bekommst du einen Schlüssel und behältst ihn, bis du ihn freiwillig zurückgibst. Das Bad bleibt so, wie du es hinterlassen hast, auch wenn du zwischendurch nur eine Stunde in der Küche stehst. Im **Transaction Mode** gilt der Schlüssel nur für einen Duschgang. Danach gibst du ihn ab und bekommst beim nächsten Mal womöglich ein anderes Bad. Das ist effizient und typisch Kollektiv. Die Analogie hinkt an einer Stelle: Dein Handtuch bleibt nicht automatisch an deinem Haken. Genau das ist der technische Kern.\n\n**Technisch:** Beide Modi laufen über Supavisor, aber auf verschiedenen Ports. Session Mode nutzt 5432 und Transaction Mode 6543 [1][2].\n\n- **Session Mode:** Der Pooler weist dir eine echte Postgres-Verbindung zu. Sie bleibt bei dir, bis du sie freigibst, das Verhalten ähnelt also einer Direktverbindung. Prepared Statements werden unterstützt, und Clients können in der Warteschlange stehen, falls gerade keine Verbindung frei ist [3]. Außerdem ist der Modus IPv4-kompatibel [3].\n- **Transaction Mode:** Die Backend-Verbindung geht nach jeder Transaktion zurück in den Pool. Deshalb überlebt alles, was an der Session hängt, nicht zuverlässig. Die Doku nennt vier Dinge: Prepared Statements, `with hold`-Cursor, Session-State und Query-Pipelining [4]. Zum Session-State zählen `SET`/`RESET`, Session-Advisory-Locks, `LISTEN`/`NOTIFY` und Temp-Tabellen [4]. Dafür eignet sich der Modus gut für Serverless und Edge Functions mit vielen kurzen Verbindungen [5].\n\n| | Session (5432) | Transaction (6543) |\n|---|---|---|\n| Backend-Verbindung gehört dir | bis zum Session-Ende | nur während einer Transaktion |\n| Prepared Statements | ja | nein |\n| `SET`, `LISTEN`, Temp-Tabellen | ja | nur innerhalb einer Transaktion |\n| Typischer Einsatz | persistente Clients, Migrationen | Serverless, viele kurze Verbindungen |\n\nEine Warnung zu den Quellen: Die Supavisor-FAQ sagt, im Transaction Mode dürfe ein Client \"eine einzelne Query\" machen [3]. Das ist eine vereinfachende Formulierung. Die Verbindungs-Doku beschreibt es genauer: Die Verbindung geht nach jeder *Transaktion* zurück [4]. Ich halte die genauere Fassung für maßgeblich. Die Doku-Autoren sind sich da offenbar selbst nicht einig, ich sehe darin keine Verschwörung, nur Bürokratie.\n\nEin Vorbehalt zur Aktualität: Die Quellen wurden am 21.10.2026 abgerufen. Dass Supavisor keine Prepared Statements im Transaction Mode unterstützt, steht dort so [4]. Ob sich das ändert, prüfst du bei Bedarf in der aktuellen Doku.\n\nJetzt eine Vorhersage von dir. Ein Client verbindet sich über Port 6543 und führt zwei getrennte Statements im Autocommit aus:\n\n```sql\nset statement_timeout = '10min';\n-- zweites, separates Statement:\nselect pg_sleep(30);\n```\n\nWas passiert mit dem `statement_timeout` beim zweiten Statement, und warum? Mach dir kurz Gedanken. Ich schau derweil, ob noch Pralinen da sind.",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/platform/ipv4-address.md#supavisor-in-session-mode-port-5432",
+    "title": "Supavisor in session mode (port 5432)",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:28.412041+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/platform/ipv4-address.md#supavisor-in-transaction-mode-port-6543",
+    "title": "Supavisor in transaction mode (port 6543)",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:28.412041+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI.md#supavisor-transaction-mode-vs-session-mode",
+    "title": "Supavisor: Transaction mode vs. Session mode?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:29.721925+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/database/connecting-to-postgres.md#transaction-mode-limitations",
+    "title": "Transaction mode limitations",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:46.793099+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/database/connecting-to-postgres.md#shared-pooler-transaction-mode-pooler-transaction-mode",
+    "title": "Shared pooler, transaction mode",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:46.793099+00:00"
+   }
+  ],
+  "next_question": "Ein Client auf Port 6543 führt `set statement_timeout = '10min';` und danach als separates Autocommit-Statement `select pg_sleep(30);` aus. Was passiert mit dem Timeout beim zweiten Statement, und warum?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "Session vs. Transaction Mode, Schritt 1"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Supavisor session mode vs transaction mode port 5432 6543",
+    "products": [
+     "database",
+     "platform"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "transaction mode prepared statements not supported pooler",
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2920,
+  "cache_creation_input_tokens": 6681,
+  "cache_read_input_tokens": 37434
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

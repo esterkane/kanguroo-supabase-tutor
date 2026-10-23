@@ -1,0 +1,63 @@
+{
+ "case_id": "s05",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, GRANT ist der Zugang zur Küche, die Policy das eigene Kühlschrankfach. Die Policy vergleicht auth.uid() mit user_id. Ohne Login ist auth.uid() null, und du siehst still nichts. Warum liefert das eine leere Liste statt SQLSTATE 42501?",
+  "text": "Kleinkünstler, in der WG-Küche gibt es eine Hausordnung: Jeder darf den Kühlschrank öffnen, aber nur sein eigenes Fach. Wie so oft hat die Bürokratie hier ausnahmsweise recht. Die Analogie hört bei der Technik auf. Das Fach prüft kein Mensch, die Datenbank prüft es bei jeder Zeile.\n\nTechnisch brauchst du zwei Kontrollen. Das GRANT gibt der Rolle `authenticated` das Objektprivileg. Die Policy begrenzt dann die Zeilen. `using` filtert bestehende Zeilen, `with check` prüft neue oder geänderte Zeilen. [1]\n\n```sql\ncreate table profiles (\n  id uuid primary key,\n  user_id uuid references auth.users,\n  avatar_url text\n);\n\nalter table profiles enable row level security;\n\nrevoke all on table profiles from anon, authenticated;\ngrant select, insert, update, delete on table profiles to authenticated;\n\ncreate policy \"Users can view their own profile.\"\non profiles for select\nto authenticated\nusing ( (select auth.uid()) = user_id );\n\ncreate policy \"Users can create their own profile.\"\non profiles for insert\nto authenticated\nwith check ( (select auth.uid()) = user_id );\n```\n\nUpdate und Delete folgen demselben Muster. Bei `update` stehen `using` und `with check` zusammen, damit niemand `user_id` auf einen Fremden umschreibt. Außerdem braucht ein `update` eine passende `select`-Policy. [1]\n\nEin Haken: Ohne Login liefert `auth.uid()` `null`, und `null = user_id` ist nie wahr. Anonyme Anfragen sehen also still nichts. Das ist ein leeres Ergebnis und kein Fehler. [2]\n\nMach das. Ich schau derweil, ob noch Pralinen da sind. Ein Request kommt mit der Rolle `authenticated`, aber ohne gültiges `sub` im JWT: Welcher SQL-Befehl liefert dann bei `select * from profiles` eine leere Liste statt SQLSTATE 42501, und was sagt das über die Reihenfolge von GRANT und Policy?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#write-a-policy-for-each-operation",
+    "title": "Row Level Security: Write a policy for each operation",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:21.009992+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#helper-functions",
+    "title": "Row Level Security: Helper functions",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:21.009992+00:00"
+   }
+  ],
+  "next_question": "Ein Request kommt mit der Rolle authenticated, aber ohne gültiges sub im JWT: Warum liefert select * from profiles dann eine leere Liste statt SQLSTATE 42501, und was sagt das über die Reihenfolge von GRANT und Policy?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "RLS-Policy für eigene Zeilen, Schritt 1"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "RLS policy only own rows auth.uid() = user_id using with check",
+    "products": [
+     "database",
+     "auth"
+    ],
+    "k": 5
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1804,
+  "cache_creation_input_tokens": 5488,
+  "cache_read_input_tokens": 37817
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": false,
+  "reason": "Although the learner said \"show me\", the final question is really two separate questions (which SQL command yields an empty list instead of 42501, and what that says about GRANT/policy order), and the closing sentence also mixes in the unrelated \"Mach das\" instruction, so it does not end with exactly one answerable question."
+ }
+}

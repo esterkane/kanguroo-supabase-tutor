@@ -1,0 +1,36 @@
+{
+ "case_id": "s12",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, langsam ist ein Symptom, keine Ursache. Ohne Abfrage und Plan wäre jede Ursache geraten. Lass einmal reines EXPLAIN laufen und poste den Plan. Wie lautet deine Abfrage, und läuft sie über die API oder direkt per SQL?",
+  "text": "Kleinkünstler, \"langsam\" ist ein Symptom, keine Ursache. Der Vermieter nennt auch jedes Problem \"die Rohre\". Ich kenne weder deine Abfrage noch den Plan. Eine Ursache zu nennen wäre also geraten, und geraten wird in der Branche schon genug.\n\nSchritt 1 von 5: Wir holen Evidenz. Führe das in einer Testumgebung aus und poste den Plan. Ersetze die Abfrage durch deine. Reines `EXPLAIN` führt sie nicht aus, deshalb ist es sicher. `EXPLAIN ANALYZE` führt sie dagegen aus, das heben wir uns für später auf.\n\n```sql\nexplain\nselect *\nfrom deine_tabelle\nwhere deine_spalte = 'wert';\n```\n\nDann sehen wir, ob es ein Seq Scan, ein Sort oder etwas anderes ist. Das ist genau der Teil, bei dem du letztes Mal den Sort übersehen hast. Ich schau derweil, ob noch Pralinen da sind.\n\nWie lautet deine Abfrage, und läuft sie über die API (PostgREST) oder direkt per SQL?",
+  "diagrams": [],
+  "citations": [],
+  "next_question": "Wie lautet deine Abfrage, und läuft sie über die API (PostgREST) oder direkt per SQL?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "slow query step 1: gather evidence"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [],
+ "usage": {
+  "input_tokens": 2,
+  "output_tokens": 968,
+  "cache_creation_input_tokens": 794,
+  "cache_read_input_tokens": 18507
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": false,
+  "reason": "Die Antwort endet mit einer zusammengesetzten Frage (Wie lautet deine Abfrage, und läuft sie über die API oder direkt per SQL?), also mehreren separaten Fragen, und enthält zudem die Anweisung, den Plan zu posten, statt auf genau eine beantwortbare Frage zu zielen."
+ }
+}

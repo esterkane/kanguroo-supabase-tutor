@@ -1,0 +1,67 @@
+{
+ "case_id": "p02",
+ "turn": {
+  "mode": "neutral",
+  "language": "de",
+  "persona_on": false,
+  "speech": "Ein GRANT erteilt einer Rolle ein Privileg auf ein Objekt, etwa SELECT auf eine Tabelle. Policies entscheiden danach, welche Zeilen sichtbar sind. Wenn der Grant fehlt: leere Ergebnismenge oder Fehler 42501?",
+  "text": "Neutraler Modus.\n\n**Was ein GRANT ist**\n\nEin GRANT ist ein PostgreSQL-Befehl, der einer Rolle ein Privileg auf ein Objekt erteilt. Das Objekt kann eine Tabelle, ein Schema, eine Funktion oder eine Sequenz sein. Beispiele für Privilegien sind `SELECT`, `INSERT`, `UPDATE` und `DELETE`.\n\n```sql\ngrant select on table public.reports to authenticated;\n```\n\nDieser Befehl erlaubt der Rolle `authenticated`, die Tabelle `public.reports` zu lesen. `REVOKE` nimmt ein Privileg wieder weg.\n\n**Warum das bei Supabase wichtig ist**\n\nPostgres führt zwei getrennte Prüfungen aus. Grants entscheiden, ob eine Rolle eine Operation auf der Tabelle überhaupt ausführen darf. Policies (RLS) entscheiden, auf welche Zeilen sich die Operation bezieht. [1]\n\nFehlt ein Grant, liefert die Datenbank SQLSTATE `42501`, bevor eine Policy ausgewertet wird. Wenn eine Anfrage scheitert, die deine Policy erlauben sollte, prüfe zuerst die Grants. [1]\n\nSupabase ordnet jede API-Anfrage einer Rolle zu. `anon` steht für nicht angemeldete Anfragen, `authenticated` für angemeldete. Beides sind normale Postgres-Rollen. [2]\n\n**Sicherheitshinweis**\n\nAuf bestehenden Projekten bekommt eine neue Tabelle in `public` zunächst alle Privilegien für `anon`, `authenticated` und `service_role`. Das gilt nicht für jedes Projekt, die Dokumentation verweist auf die Seite \"Default privileges\". Policies nehmen diese Grants nicht zurück. Eine Tabelle, die nur durch Policies geschützt ist, kann `anon` also weiterhin einen Insert-Pfad bieten, wenn du den Grant nie entziehst. [1]\n\nEmpfohlenes Muster laut Dokumentation: RLS aktivieren, mit `revoke all` alles entziehen, dann nur das nötige Privileg zurückgeben. [3]\n\n**Vorhersage**\n\nEine Tabelle hat RLS aktiviert und eine Policy `for select to authenticated using (true)`. Für `authenticated` wurde aber nie ein `SELECT`-Grant erteilt.\n\nWelchen Fehler liefert ein `select` als `authenticated`: eine leere Ergebnismenge oder SQLSTATE `42501`?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies",
+    "title": "Row Level Security > Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#authenticated-and-unauthenticated-roles",
+    "title": "Row Level Security > Authenticated and unauthenticated roles",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#enable-rls-and-set-the-grants",
+    "title": "Enable RLS and set the grants",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   }
+  ],
+  "next_question": "Eine Tabelle hat RLS und eine SELECT-Policy für authenticated, aber keinen SELECT-Grant: Liefert ein select als authenticated eine leere Ergebnismenge oder SQLSTATE 42501?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "GRANT vs RLS basics"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "GRANT privileges on tables to roles anon authenticated, RLS vs grants",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 5
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1861,
+  "cache_creation_input_tokens": 4384,
+  "cache_read_input_tokens": 37459
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

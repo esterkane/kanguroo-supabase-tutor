@@ -1,0 +1,91 @@
+{
+ "case_id": "g18",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "TIMED_OUT means the channel didn't reach SUBSCRIBED in time. Per the docs, the most common cause is a Node.js older than 22 with a recent supabase-js. Other causes are slow RLS policies on private channels, JWT problems, proxies and rate limits. Which runtime is your client running in?",
+  "text": "`TIMED_OUT` is one of the status values that `channel.subscribe((status, err) => ...)` can report. The others are `SUBSCRIBED`, `CHANNEL_ERROR` and `CLOSED`. The docs list it as a connection-level problem, not an application-level one. The channel didn't reach `SUBSCRIBED` in time, or the connection timed out afterward [1][2]. The status says \"something timed out\". It does not say what. The causes below are in rough order of likelihood.\n\n**1. Node.js and `realtime-js` version mismatch (most common, per the docs).** The docs say `TIMED_OUT` \"more often\" comes from a mismatch between `realtime-js` (bundled in `supabase-js`) and your Node.js version than from an idle timeout. The problem shows up on Node.js older than v22 with recent `supabase-js` versions. The fixes are to upgrade Node.js to a current LTS or to set the WebSocket transport explicitly. The linked GitHub discussion has the details [3]. This applies to Node runtimes, such as SSR, scripts and serverless functions, not to browsers.\n\n**2. A slow RLS policy on a private channel.** The troubleshooting guide says a slow policy on `realtime.messages` can make the join time out instead of failing outright [1]. A missing policy behaves differently: you connect but receive no messages [4].\n\n**3. Other connection-level causes from the same checklist** [1]:\n- The JWT is expired, lacks `role` or `exp`, or comes from a third-party provider whose JWKS endpoint is unreachable.\n- A reverse proxy or SSL terminator isn't forwarding the `Upgrade` and `Connection` headers, so the WebSocket handshake never completes.\n- The client isn't sending a heartbeat at least every 25 seconds.\n- A plan connection or join-rate limit has been reached.\n- The project is paused or Realtime is disabled.\n\n**What `TIMED_OUT` is not.** Explicit rejections arrive as a `system` message with `status: \"error\"`, for example `Token has expired`. Those are followed by `phx_close` [2]. Check the second callback argument `err` for those. A `TIMED_OUT` with no explicit rejection points away from auth and toward transport, runtime or slowness.\n\n**Minimal first test.** Log both arguments, then compare behavior across runtimes:\n\n```js\nchannel.subscribe((status, err) => {\n  console.log(new Date().toISOString(), status, err)\n})\n```\n\nRun `node --version` and check your `supabase-js` version. If the same code connects from a browser but times out from Node, cause 1 becomes very likely. This is an inference from the docs, not something I've reproduced here. Realtime logs in the dashboard are the next evidence source [5].\n\nSources are all official Supabase docs, fetched 2026-10-21. I have not verified newer releases than those pages describe.\n\nWhich environment is your client running in: browser, Node (which version), or an edge or serverless runtime?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/troubleshooting/realtime-messages-not-arriving.md#connection-problems",
+    "title": "Realtime: Messages Not Arriving Troubleshooting > Connection problems",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:28.073546+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/realtime/protocol.md#channel-level-system-errors",
+    "title": "Realtime Protocol > Channel-level system errors",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:42.089120+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/troubleshooting/realtime-connections-timed_out-status.md#realtime-connections-giving-timed-out-errors",
+    "title": "Realtime connections giving TIMED_OUT errors",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:45.927946+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/realtime/settings.md#allow-public-access-to-channels",
+    "title": "Settings > Allow public access to channels",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:42.795892+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/realtime/limits.md#limit-errors",
+    "title": "Realtime Limits > Limit errors",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:53.927921+00:00"
+   }
+  ],
+  "next_question": "Which environment is your client running in: browser, Node (which version), or an edge or serverless runtime?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "Realtime TIMED_OUT diagnosis"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Realtime channel subscribe status TIMED_OUT",
+    "products": [
+     "realtime"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Realtime subscribe CHANNEL_ERROR TIMED_OUT CLOSED troubleshooting",
+    "products": [
+     "realtime",
+     "kb"
+    ],
+    "k": 8
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2058,
+  "cache_creation_input_tokens": 13491,
+  "cache_read_input_tokens": 37316
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

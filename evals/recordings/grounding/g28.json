@@ -1,0 +1,114 @@
+{
+ "case_id": "g28",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "Rotation depends on hosted versus self-hosted. On hosted, create publishable and secret keys first, migrate to JWT signing keys, rotate, then revoke after tokens expire. Is your project hosted or self-hosted, and is this routine or a suspected leak?",
+  "text": "# Rotating the JWT secret and API keys\n\nThe answer depends on whether your project is hosted or self-hosted, and whether a key has leaked. Below is the hosted path. It is the current recommended one. The sources are the official docs as retrieved this turn.\n\n## Background: two separate things\n\n| Item | What it is | Current direction |\n|---|---|---|\n| **JWT secret / signing keys** | Used by Auth to sign user access tokens. | Migrate from the legacy shared secret to JWT signing keys. |\n| **API keys** | `anon` / `service_role` (legacy, JWT-based) versus `sb_publishable_...` / `sb_secret_...` (new). | Move to publishable and secret keys. |\n\nWith the legacy system, `anon` and `service_role` had to be rotated together with the JWT secret. Rotation caused downtime and signed out active users [4]. The new publishable and secret keys are no longer based on the JWT signing key, so you can manage them independently [4].\n\n## Hosted: recommended order (no downtime)\n\n**1. Create new API keys alongside the old ones.**\n- Create publishable and secret keys in **Settings > API Keys**.\n- This doesn't revoke the legacy keys. Both systems work at the same time [5].\n- Swap your clients over gradually.\n- Then disable `anon` and `service_role` in the same Dashboard section, which is a separate step [5].\n\n**2. Migrate the JWT secret to signing keys.**\n- On the JWT signing keys page, click *Migrate JWT secret*. This imports the legacy secret and creates a new asymmetric key in the standby state [1].\n- Before you click *Rotate keys*, check two things [1].\n  - Your app must not verify JWTs directly against the legacy secret, for example with `jose` or `jsonwebtoken`. If it does, the rotation can break those components.\n  - Edge Functions with the *Verify JWT* setting may break. Turn the setting off and verify with `supabase.auth.getClaims()` instead.\n- Rotating makes Auth sign new tokens with the new key. Unexpired tokens are still accepted, so no one is signed out [1].\n\n**3. Revoke the old key after the old tokens expire.**\n- If the access token expiry is 1 hour, the docs say to wait at least 1 hour and 15 minutes before revoking the legacy secret [1].\n- During an active security incident, you can revoke it immediately [1].\n- Every step except permanent deletion is reversible. A revoked or previously used key can go back to standby, and you can rotate to it again [3].\n\n## If something leaked\n\n- Switch to publishable and secret keys and disable `anon` and `service_role` [2].\n- Revoke the compromised signing key. Supabase products (Auth, Data API, Storage, Realtime) don't rely on the key cache, so revocation is instantaneous for them [7].\n- Your own backends might still trust the old key. According to the docs, the discovery endpoint is cached by Supabase's edge servers for 10 minutes, and the client libraries may cache keys in memory for another 10 minutes [7]. You need a cache-busting mechanism in your own components [7].\n\n## Mobile, desktop and CLI apps\n\nIf these apps embed the `anon` key and you need to replace a `service_role` JWT, the docs advise substituting a new secret key [8]. You can create it in the Dashboard without downtime [8]. The docs say to do this when the JWT secret itself is secure.\n\n## Self-hosted\n\nKeys live in your `.env` file. To rotate the publishable and secret keys without changing the asymmetric key pair, run [6]:\n\n```sh\nsh utils/rotate-new-api-keys.sh --update-env\nsh run.sh recreate\n```\n\nThis doesn't invalidate existing user sessions [6]. Regenerating the asymmetric key pair does affect active sessions [6].\n\n## Limits of this answer\n\n- I didn't retrieve the dedicated \"Migrating to new API keys\" page, so step 1 relies on the API keys page. Check the migration page for the full checklist before you change production.\n- Dashboard button labels can change. Check them live.\n- I haven't run any of this. The Dashboard actions affect your real project, which I can't reach.\n\nIs your project hosted or self-hosted, and is this a routine rotation or a suspected leak? The order of steps changes if it's a leak.",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/signing-keys.md#getting-started",
+    "title": "JWT Signing Keys: Getting started",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:51Z"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/auth/signing-keys.md#rotating-and-revoking-keys",
+    "title": "JWT Signing Keys: Rotating and revoking keys",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:51Z"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/auth/signing-keys.md#lifetime-of-a-signing-key",
+    "title": "JWT Signing Keys: Lifetime of a signing key",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:51Z"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/auth/signing-keys.md#benefits-of-the-signing-keys-system",
+    "title": "JWT Signing Keys: Benefits of the signing keys system",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:51Z"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/api/api-keys.md#legacy-anon-and-service-role-keys",
+    "title": "API keys: Legacy anon and service_role keys",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:55Z"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/hosting/docker.md#rotating-api-keys",
+    "title": "Self-Hosting with Docker: Rotating API keys",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:47Z"
+   },
+   {
+    "n": 7,
+    "url": "https://supabase.com/docs/guides/auth/signing-keys.md#public-key-discovery-and-caching",
+    "title": "JWT Signing Keys: Public key discovery and caching",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:51Z"
+   },
+   {
+    "n": 8,
+    "url": "https://supabase.com/docs/guides/auth/signing-keys.md#using-jwt-based-anon-key-in-a-mobile-desktop-or-cli-application-and-need-to-rotate-a-service-role-jwt-secret",
+    "title": "JWT Signing Keys FAQ: rotating service_role in mobile/desktop/CLI apps",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:51Z"
+   }
+  ],
+  "next_question": "Is your project hosted or self-hosted, and is this a routine rotation or a suspected leak?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "key rotation overview"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "rotate JWT secret signing keys",
+    "products": [
+     "auth",
+     "platform"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "API keys publishable secret key rotate legacy anon service_role",
+    "products": [
+     "api",
+     "platform",
+     "auth"
+    ],
+    "k": 8
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 5971,
+  "cache_creation_input_tokens": 14837,
+  "cache_read_input_tokens": 67577
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

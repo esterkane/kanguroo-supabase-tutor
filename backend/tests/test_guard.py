@@ -37,8 +37,10 @@ def test_question_rules() -> None:
     assert "NO_QUESTION" not in codes(turn(mode="incident", next_question=None,
                                            incident={"symptom": "slow"}))
     assert codes(turn(next_question="A? Oder B?"))["MULTI_QUESTION"] == "block"
-    many = f"Warum? Wieso? Weshalb?\n\n{Q} [1]"
-    assert codes(turn(text=many))["MULTI_QUESTION"] == "warn"
+    two = f"GRANT und RLS [1]. Wer prüft zuerst?\n\n{Q}"
+    assert codes(turn(text=two))["MULTI_QUESTION"] == "block"  # exactly one question in teaching modes
+    assert "MULTI_QUESTION" not in codes(turn(text=two, mode="incident", next_question=None,
+                                              incident={"symptom": "x"}))
     assert codes(turn(text="GRANT und RLS [1]."))["QUESTION_NOT_IN_TEXT"] == "warn"
     reworded = turn(next_question="Welche der beiden Kontrollen, GRANT oder RLS-Policy, prüfst du zuerst?",
                     text="GRANT und RLS [1].\n\nWelche der beiden Kontrollen, GRANT (Tabellenprivileg) oder "
@@ -199,3 +201,13 @@ async def test_refusal_and_unstructured_turns_are_redacted_too() -> None:
     final = (await run(client))[-1]
     assert isinstance(final, o.Final) and final.turn.guard_flags == ["unstructured"]
     assert "sb_secret_" not in final.turn.text
+
+
+def test_secret_the_learner_pasted_is_never_repeated() -> None:
+    pasted = "postgresql://postgres.abcd:SuperGeheim123!@aws-0-eu.pooler.supabase.com:6543/postgres"
+    ctx = g.GuardContext(sources=CTX.sources, learner_text=f"Mein Login geht nicht: {pasted}")
+    warning = turn(text=f"Wenn `SuperGeheim123!` echt ist, setz es zurück [1].\n\n{Q}")
+    assert codes(warning, ctx)["SECRET_LEAK"] == "block"  # even inside a well-meant warning
+    assert "SECRET_LEAK" not in codes(warning, CTX)  # without the learner's message it is just a word
+    redacted = g.redact_secrets(warning, ctx.learner_text)
+    assert "SuperGeheim123" not in redacted.text and "[REDACTED]" in redacted.text

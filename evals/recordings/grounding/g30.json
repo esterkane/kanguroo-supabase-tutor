@@ -1,0 +1,129 @@
+{
+ "case_id": "g30",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "Limits depend on compute size. Pool size is adjustable in Database Settings, Postgres max connections via the CLI with caveats, and pooler client limits only by upgrading compute. Which exact error are you seeing?",
+  "text": "Your project has several connection limits, and only some of them can be changed. All figures are from docs fetched 2026-10-21.\n\n## Default limits by compute size\n\n| Compute | Postgres max connections (direct) | Pooler max clients |\n|---|---|---|\n| Nano (free) / Micro | 60 | 200 |\n| Small | 90 | 400 |\n| Medium | 120 | 600 |\n| Large | 160 | 800 |\n| XL | 240 | 1,000 |\n| 2XL | 380 | 1,500 |\n| 4XL | 480 | 3,000 |\n| 8XL–16XL | 490–500 | 6,000–12,000 |\n\nSource: [Compute and Disk](https://supabase.com/docs/guides/platform/compute-and-disk#postgres-replication-slots-wal-senders-and-connections) [1]. Your own value depends on your compute size, which I can't see. You can check it with `SHOW max_connections;`.\n\n## Three different limits\n\n| Limit | Set by | Adjustable? |\n|---|---|---|\n| Postgres `max_connections` | Compute size by default | Yes, but see the warning below |\n| Pooler client connections | Compute size | No, only by upgrading compute [2][3] |\n| Pooler pool size (backend connections to Postgres) | Dashboard setting | Yes |\n\nThe docs describe the relationship between the limits like this [2]:\n\n```txt\nDirect connections + Supavisor backend connections + PgBouncer backend connections\n  < Postgres max connections\n```\n\nAuth, Storage, PostgREST and the health checker also hold connections from the same total [2].\n\n## How to change them\n\n**Pool size (the usual fix).** Change it in the [Database Settings](https://supabase.com/dashboard/project/_/database/settings) page. Supavisor and PgBouncer read the same setting but apply it independently [4]. The docs suggest staying under about 40% of max connections if you use the PostgREST API heavily, and up to about 80% otherwise [5].\n\nTwo caveats:\n- Pool size applies per unique user, database and mode combination, not per project [6].\n- The dashboard labels may not match. One KB page names the fields \"Max Client Connections\" and \"Default Pool Size\", and it appears to describe them in swapped order [7]. Check what your dashboard shows.\n\n**Postgres `max_connections`.** The KB documents changing it with the CLI [8]:\n\n```sh\nnpx supabase login\nnpx supabase --experimental --project-ref <PROJECT_REF> postgres-config update --config max_connections=<INTEGER>\n```\n\nThen verify with `SHOW max_connections;`.\n\n> ⚠ Risk: The KB warns that setting this by hand hard-codes the value. It will not auto-resize if you later upgrade or downgrade compute, so you have to update it yourself [8]. Raising it too far can also reduce throughput, because Postgres spends more effort scheduling backends [8]. I couldn't confirm in this session whether the config change restarts the database, so check the [custom Postgres config guide](https://supabase.com/docs/guides/database/custom-postgres-config) before running it on production.\n\n**Pooler client limit.** This cannot be changed independently. It is hard-coded per compute size, and the only way to raise it is a larger compute [8].\n\n**Syntax check.** The KB command is a troubleshooting article and I did not verify it against the current CLI. Run `npx supabase postgres-config --help` first.\n\n## Which limit are you hitting?\n\nRaising a limit only helps if you've identified the one you're hitting:\n- \"Max client connections reached\" means the pooler or pool size.\n- \"remaining connection slots are reserved\" or \"too many connections\" means Postgres itself.\n\nWhich exact error message or symptom are you seeing?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/platform/compute-and-disk.md#postgres-replication-slots-wal-senders-and-connections",
+    "title": "Compute and Disk: Postgres replication slots, WAL senders, and connections",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:31.570506Z"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/connecting-to-postgres/pooling-and-limits.md#client-connections-and-backend-connections-client-connections-and-backend-connections",
+    "title": "Connection pooling and limits: Client connections and backend connections",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:28.205428Z"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/troubleshooting/how-to-change-max-database-connections-_BQ8P5.md#configuring-direct-connections-limits",
+    "title": "How to change max database connections: Configuring direct connections limits",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:33.645601Z"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/database/connecting-to-postgres/pooling-and-limits.md#pool-size-pooler-pool-size",
+    "title": "Connection pooling and limits: Pool size",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:28.205428Z"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/database/connection-management.md#configuring-supavisor-s-pool-size",
+    "title": "Connection management: Configuring Supavisor's pool size",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:07.811026Z"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI.md#in-the-context-of-supavisor-what-does-pool-size-mean",
+    "title": "Supavisor FAQ: what does pool size mean",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:29.721925Z"
+   },
+   {
+    "n": 7,
+    "url": "https://supabase.com/docs/guides/troubleshooting/how-do-i-update-connection-pool-settings-in-my-dashboard-wAxTJ_.md#how-do-i-update-connection-pool-settings-in-my-dashboard",
+    "title": "How do I update connection pool settings in my dashboard?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:19.251221Z"
+   },
+   {
+    "n": 8,
+    "url": "https://supabase.com/docs/guides/troubleshooting/how-to-change-max-database-connections-_BQ8P5.md#how-to-change-max-database-connections",
+    "title": "How to change max database connections",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:33.645601Z"
+   }
+  ],
+  "next_question": "Which exact error message or symptom are you seeing (for example 'Max client connections reached', 'remaining connection slots are reserved', or timeouts)?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "connection limits, identify which limit is hit"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": [
+   "CITATION_UNUSED"
+  ]
+ },
+ "findings": [
+  "CITATION_UNUSED"
+ ],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "max connections per compute size direct connections pooler client connections",
+    "products": [
+     "database",
+     "platform",
+     "pricing"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "change pool size max connections Supavisor database settings",
+    "products": [
+     "database",
+     "platform",
+     "kb"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "How to change max database connections",
+    "products": [
+     "kb"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 6,
+  "output_tokens": 3086,
+  "cache_creation_input_tokens": 51196,
+  "cache_read_input_tokens": 105383
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

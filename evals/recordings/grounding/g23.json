@@ -1,0 +1,67 @@
+{
+ "case_id": "g23",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, ein lokales Supabase braucht die CLI und eine Docker-kompatible Runtime, auf dem Mac empfiehlt die Doku OrbStack. Danach folgen init und start. Aber ich rate nicht, was du hast. Führe docker info aus: Kommt eine Server-Ausgabe oder ein Fehler?",
+  "text": "Kleinkünstler, ein lokales Supabase-Projekt ist eine WG auf Zeit: Du mietest eine Wohnung (den Container-Runtime), stellst Möbel hinein (die Supabase-Dienste) und kannst alles wieder abreißen, ohne dass der Vermieter etwas merkt. Der Unterschied zur echten WG: Der Vermieter ist hier dein Laptop, und er hat nur begrenzt Platz. Ich bin Känguru, ich teile mir Platz grundsätzlich gern fremdes Eigentum. Die Doku wehrt sich nicht dagegen.\n\nDer Kern laut offizieller Doku ist kurz. Du brauchst die Supabase CLI und einen Docker-kompatiblen Container-Manager [1]. Auf macOS wird OrbStack empfohlen. Docker Desktop, Rancher Desktop, Podman und colima gehen als Alternativen [2]. Danach laufen im Projektverzeichnis zwei Befehle: `supabase init` (legt nur lokale Dateien an, kein Login, keine Verbindung zu einem gehosteten Projekt) und `supabase start`. Wenn du die CLI per npm als Projektabhängigkeit installiert hast, schreibst du `npx supabase init` und `npx supabase start` [2]. Der erste Start lädt viele Images und dauert [2]. Für alle Dienste empfiehlt die Referenz mindestens 7 GB RAM [3].\n\nIch liefere die Befehle erst vollständig, wenn ich weiß, was bei dir schon läuft. Ich rate nicht, was dein Rechner hat. Mein Plan:\n\n1. Voraussetzungen prüfen (Runtime, Node).\n2. Einen Wegwerf-Lab-Stack starten.\n3. Eine Anfrage vom Client bis Postgres verfolgen: API, Auth, PostgREST-Rolle, GRANT, RLS, Tabelle.\n4. Ein absichtlich kaputtes RLS-/GRANT-Szenario reparieren, ohne dass ich dir die Lösung verrate.\n\nErste Frage, eine einzige: Welche Docker-kompatible Runtime ist bei dir installiert und läuft, falls überhaupt eine? Führe `docker info` im Terminal aus und sag mir, ob du eine Server-Ausgabe oder eine Fehlermeldung bekommst. `info` und nicht `--version`, weil das Docker-CLI auch ohne laufende Engine existiert. Ich schaue derweil, ob noch Pralinen da sind.\n\n[1] https://supabase.com/docs/guides/cli.md#local-development-cli\n[2] https://supabase.com/docs/guides/local-development/cli/getting-started.md#run-a-local-supabase-project-running-a-local-supabase-project\n[3] https://supabase.com/llms/cli.txt#start-containers-for-supabase-local-development",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/cli.md#local-development-cli",
+    "title": "Local Development & CLI",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:21.625999+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/local-development/cli/getting-started.md#run-a-local-supabase-project-running-a-local-supabase-project",
+    "title": "Run a local Supabase project",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:00.400777+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/llms/cli.txt#start-containers-for-supabase-local-development",
+    "title": "Start containers for Supabase local development",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:40.988705+00:00"
+   }
+  ],
+  "next_question": "Welche Docker-kompatible Runtime ist bei dir installiert und läuft, und was gibt `docker info` aus: Server-Ausgabe oder Fehlermeldung?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "Schritt 1 von 4: Voraussetzungen prüfen"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "supabase CLI local development getting started requirements Docker",
+    "products": [
+     "cli",
+     "local-development"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1928,
+  "cache_creation_input_tokens": 3794,
+  "cache_read_input_tokens": 37427
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

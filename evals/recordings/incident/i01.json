@@ -1,0 +1,72 @@
+{
+ "case_id": "i01",
+ "turn": {
+  "mode": "incident",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, langsam ist ein Symptom, keine Ursache. Der Vermieter sagt auch zu allem Rohre. Ich brauche den Scope: Sind nur Anfragen langsam, die die Datenbank berühren, oder auch Auth, Storage und Edge Functions?",
+  "text": "Kleinkünstler, \"langsam\" ist ein Symptom und keine Ursache. Der Vermieter sagt auch zu jedem Problem \"die Rohre\". Ich rate deshalb nicht, sondern baue zuerst das Incident-Modell. Bisher ist fast alles leer.\n\n**Incident-Modell (Stand jetzt)**\n\n| Feld | Stand |\n|---|---|\n| SYMPTOM | \"langsam\", ohne Messwert, ohne Fehlercode |\n| ERWARTET | unbekannt (welche Latenz war vorher normal?) |\n| SCOPE | unbekannt |\n| ZEITLINIE | \"seit gestern\". Die Uhrzeit und die Änderung davor fehlen noch. |\n| UMGEBUNG | unbekannt (hosted oder lokal, Plan, Postgres-Version, SDK) |\n| EVIDENZ | keine |\n\n**Vorläufige Hypothesen** (nur nach Häufigkeit sortiert, noch ohne Evidenz):\n\n1. Eine einzelne Query oder ein Query-Muster ist langsam geworden. Mögliche Gründe sind Datenwachstum, ein fehlender oder unbenutzter Index, ein schlechter Plan oder eine teure RLS-Policy.\n2. Das Problem liegt in den Ressourcen: CPU, Speicher, IO oder Verbindungen sind erschöpft.\n3. Sperren oder lange Transaktionen blockieren andere Sessions.\n4. Das Problem liegt nicht in der Datenbank, sondern in Netzwerk, Region, Client, Edge Function oder Cold Start.\n5. Seit gestern wurde etwas deployt oder migriert.\n\nDiese Liste ist eine Landkarte und keine Diagnose. Eine Hypothese ändert ihren Rang erst, wenn ein Test sie stützt oder widerlegt.\n\n**Der trennschärfste fehlende Punkt ist der Scope nach Schicht.** Wenn nur Anfragen langsam sind, die die Datenbank berühren, fallen Hypothese 4 und weite Teile von 5 zurück. Sind Auth, Storage und Edge Functions ebenfalls langsam, sieht es eher nach Ressourcen oder Netzwerk aus. Dann ist die einzelne Query unwahrscheinlicher.\n\nIch habe keinen Zugriff auf dein Projekt und sehe keine Logs. Alles, was ich später über deine Umgebung sage, muss aus deinen eingefügten Ausgaben stammen.\n\nWelche Anfragen sind langsam: nur solche, die die Datenbank abfragen (z. B. Data API und RPC), oder auch Auth-Login, Storage-Uploads und Edge Functions, die keine Tabelle anfassen? Antworte bitte mit dem, was du tatsächlich beobachtet hast, und schreib \"nicht geprüft\", falls du es nicht weißt.",
+  "diagrams": [],
+  "citations": [],
+  "next_question": "Welche Anfragen sind langsam: nur datenbankabhängige (Data API, RPC) oder auch Auth-Login, Storage-Uploads und Edge Functions ohne Tabellenzugriff? Schreib 'nicht geprüft', falls du es nicht weißt.",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "incident scoping: layer"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": {
+   "symptom": "Supabase wird als 'langsam' beschrieben, ohne Messwert oder Fehlercode",
+   "expected": null,
+   "scope": null,
+   "timeline": "seit gestern (Uhrzeit und vorangegangene Änderung unbekannt)",
+   "environment": null,
+   "evidence": [],
+   "hypotheses": [
+    {
+     "h": "Einzelne Query oder Query-Muster langsam (Datenwachstum, Index, Plan, RLS)",
+     "rank": 1,
+     "test": "Scope nach Schicht klären, dann pg_stat_statements und EXPLAIN"
+    },
+    {
+     "h": "Ressourcenerschöpfung (CPU, Speicher, IO, Verbindungen)",
+     "rank": 2,
+     "test": "Metriken und Verbindungsanzahl prüfen"
+    },
+    {
+     "h": "Sperren oder lange Transaktionen",
+     "rank": 3,
+     "test": "pg_stat_activity auf wartende Sessions prüfen"
+    },
+    {
+     "h": "Nicht-DB-Ursache (Netzwerk, Region, Client, Edge Function, Cold Start)",
+     "rank": 4,
+     "test": "Auth, Storage und Edge Functions ohne DB-Zugriff vergleichen"
+    },
+    {
+     "h": "Deployment oder Migration seit gestern",
+     "rank": 5,
+     "test": "Änderungen im Zeitfenster vor Symptombeginn abfragen"
+    }
+   ],
+   "root_cause": null,
+   "mitigation": null,
+   "permanent_fix": null,
+   "prevention": null,
+   "confidence": null
+  },
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [],
+ "usage": {
+  "input_tokens": 2,
+  "output_tokens": 2253,
+  "cache_creation_input_tokens": 529,
+  "cache_read_input_tokens": 18507
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

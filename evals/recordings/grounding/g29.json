@@ -1,0 +1,93 @@
+{
+ "case_id": "g29",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, der Wohnungsschlüssel erlaubt noch keine neue Zwischenwand. Bei der Migration fehlt der angenommenen Rolle das CREATE-Privileg auf der Datenbank. Nach SET ROLE: Welcher Wert verrät dir die prüfende Rolle, current_user oder session_user?",
+  "text": "Kleinkünstler, stell dir vor, der Vermieter gibt dir den Wohnungsschlüssel. Das erlaubt dir noch nicht, im Flur eine neue Zwischenwand einzuziehen. Dafür brauchst du eine eigene Genehmigung, und die hat die Behörde nie automatisch verteilt. Hier hört der Vergleich auf. Es geht nicht um Wände, sondern um ein konkretes Datenbankprivileg.\n\n**Was die Quellen sagen:** Der Fehler tritt laut Supabase-KB typischerweise bei `CREATE SCHEMA` oder ähnlichen Befehlen auf, nachdem die Migration ein `SET ROLE` ausgeführt hat [1]. Die Session lief als `postgres`, aber die angenommene Rolle hat kein `CREATE` auf der Datenbank. Dieses Privileg wird nicht automatisch vergeben [1]. Die Korrektur laut KB ist `GRANT CREATE ON DATABASE postgres TO <rolle>;` [1].\n\n**Was ich selbst gesehen habe (Lab, nicht deine Umgebung):** Als `authenticated` habe ich `CREATE SCHEMA` im Lab ausgeführt. Ergebnis: SQLSTATE `42501`, `permission denied for database lab`. Das ist derselbe Mechanismus: das Privileg `CREATE` auf Datenbankebene fehlt. Das Tool meldet als Statement-Typ \"select\". Ich nehme an, dass der Fehler vom `CREATE SCHEMA` kam, kann es aber nicht sicher belegen.\n\n**Eine Korrektur zur KB-Begründung:** Die KB führt die Ursache auf Postgres 15 zurück, das `CREATE` von `PUBLIC` entfernt hat [1]. Nach meinem Wissen betraf die PG-15-Änderung das Schema `public`, nicht die Datenbank. Das habe ich in dieser Runde nicht gegen die PostgreSQL-Doku geprüft. Behandle es als unbestätigt, bis wir die Stelle gelesen haben.\n\nZwei verwandte Fälle, die du nicht verwechseln solltest:\n- Kommt der `42501` über REST oder GraphQL statt über eine Migration, ist das ein anderer Fehlerpfad. Die KB verweist dafür auf eigene Hinweise [2].\n- Ein anderer `42501`-Fall: Eine Tabelle gehört einer Custom-Rolle, und `postgres` darf sie nicht ändern. Die Doku empfiehlt dann `grant \"custom_role\" to \"postgres\";` [3].\n\nFür den Fix brauchst du zuerst die Rolle, die in der Migration tatsächlich aktiv ist. Das prüfst du so, in einer Wegwerf-Umgebung oder read-only:\n\n```sql\n-- Welche Rolle ist beim Fehler aktiv?\nselect current_user, session_user;\n\n-- Hat diese Rolle CREATE auf der Datenbank?\nselect has_database_privilege(current_user, current_database(), 'CREATE');\n```\n\nErwartet wird `false` für die Rolle, die den Fehler auslöst. `has_database_privilege` ändert nichts und ist ohne Risiko.\n\nKleinkünstler, in deiner Migration steht vor dem `CREATE SCHEMA` ein `SET ROLE`. Welche der beiden Werte, `current_user` oder `session_user`, verrät dir danach die Rolle, die tatsächlich prüft, ob du das Schema anlegen darfst?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/kb/troubleshooting/resolving-permission-denied-for-database-postgres-during-migrations.md#how-to-resolve-the-issue",
+    "title": "Resolving 'permission denied for database postgres' during migrations",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:48.881136+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/troubleshooting/resolving-permission-denied-for-database-postgres-during-migrations-78f33a.md#related",
+    "title": "Resolving 'permission denied for database postgres' during migrations (Related)",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:29.676430+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/deployment/managing-environments.md#permission-denied-on-db-push",
+    "title": "Managing Environments: Permission denied on db push",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:52.172361+00:00"
+   }
+  ],
+  "next_question": "Welcher Wert, current_user oder session_user, verrät dir nach einem SET ROLE die Rolle, die tatsächlich prüft, ob du das Schema anlegen darfst?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "migration permission denied, step 1 of 4"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "permission denied for database postgres migration",
+    "products": [
+     "kb",
+     "database",
+     "cli"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "postgres role privileges supabase cannot superuser CREATE on database extension",
+    "products": [
+     "database",
+     "platform"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "run_lab_sql",
+   "input": {
+    "sql": "create role mig_demo nologin;\nselect version();\nselect has_database_privilege('mig_demo', current_database(), 'CREATE') as can_create_before;\nset local role mig_demo;\ncreate schema demo_schema;",
+    "role": "postgres"
+   }
+  },
+  {
+   "name": "run_lab_sql",
+   "input": {
+    "sql": "select current_database() as db, has_database_privilege('authenticated', current_database(), 'CREATE') as authenticated_can_create, has_database_privilege('postgres', current_database(), 'CREATE') as postgres_can_create;\ncreate schema demo_schema;",
+    "role": "authenticated"
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 3122,
+  "cache_creation_input_tokens": 16271,
+  "cache_read_input_tokens": 105776
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

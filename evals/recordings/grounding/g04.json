@@ -1,0 +1,93 @@
+{
+ "case_id": "g04",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "The anon key maps to the anon Postgres role and is public, so RLS and grants must protect your data. The service_role key maps to a role that bypasses RLS and must stay server-side. Both are legacy names for publishable and secret keys. If an Edge Function uses a secret key but forwards a user's JWT, does RLS apply?",
+  "text": "The short version is that `anon` and `service_role` are two JWT-based API keys. Each one maps to a different Postgres role, and the two roles have very different privileges.\n\n| | `anon` key | `service_role` key |\n|---|---|---|\n| Postgres role | `anon` (when no user is signed in) | `service_role` |\n| RLS | Policies apply | Bypassed, because the role has `BYPASSRLS` [1] |\n| Where it can live | Browser, mobile app, CLI. It is public and not a secret [5] | Server-side only. It must never reach the browser or customers [3] |\n| Risk if leaked | Limited to what your grants and RLS policies allow | Full read and write access to anything the role has grants on |\n\n**Current terminology (verified in docs fetched 2026-10-21).** These are the legacy names. The current equivalents are the publishable key (`sb_publishable_...`) and the secret key (`sb_secret_...`). Supabase says it is deprecating `anon` and `service_role` by the end of 2026 [2]. Both key systems work side by side, and creating new keys does not revoke the old ones [4]. For new work, use publishable and secret keys.\n\nThe legacy keys are also valid JWTs signed with the project's JWT secret. That ties the keys to the secret and makes them hard to rotate independently. The legacy JWTs also had 10-year expiry [4].\n\n**Three points that are commonly misunderstood:**\n\n1. **The key picks a role, not a user.** A publishable or `anon` key with a signed-in user resolves to `authenticated`. Without a signed-in user it resolves to `anon` [1]. The key identifies your application, and the user's own JWT identifies the person.\n2. **`service_role` still needs table grants.** Postgres checks grants first and applies RLS afterwards. A missing grant gives a permission error even for `service_role` [1]. Only RLS is bypassed.\n3. **A secret key does not always bypass RLS.** It bypasses RLS only when the request carries no user access token. If the request carries one, it runs under that user's RLS policies, even when the client was initialized with a secret key [3].\n\nThe `anon` key is only safe to expose if RLS is enabled on every table and the grants are least-privilege. Without those, the public key gives access to whatever `anon` can reach [5].\n\n**Prediction question:** An Edge Function creates its Supabase client with the secret key. It also forwards the incoming user's `Authorization: Bearer <user JWT>` header on every request. Will RLS policies apply to the queries it runs? Give your answer and the reasoning behind it.",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/api/api-keys.md#postgres-roles-and-row-level-security",
+    "title": "Postgres roles and Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:55.521049+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/api/api-keys.md#which-key-do-you-use",
+    "title": "Which key do you use?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:55.521049+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#bypassing-row-level-security",
+    "title": "Bypassing Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/auth/signing-keys.md#why-are-anon-and-service-role-jwt-based-keys-no-longer-recommended",
+    "title": "Why are anon and service_role JWT-based keys no longer recommended?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:51.037831+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/database/secure-data.md#frontend-access",
+    "title": "Securing your data: Frontend access",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:37.624617+00:00"
+   }
+  ],
+  "next_question": "An Edge Function creates its client with the secret key but forwards the incoming user's Authorization Bearer JWT on every request. Will RLS policies apply to its queries, and why?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "api keys and request lifecycle"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "anon key vs service_role key, publishable and secret API keys",
+    "products": [
+     "auth",
+     "platform",
+     "api"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "service_role bypasses Row Level Security BYPASSRLS never expose in browser",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2229,
+  "cache_creation_input_tokens": 6882,
+  "cache_read_input_tokens": 37314
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

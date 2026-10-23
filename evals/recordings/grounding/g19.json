@@ -1,0 +1,88 @@
+{
+ "case_id": "g19",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, lokal und Produktion sind zwei Wohnungen mit eigenen Schlüsselbunden. Lokal liest die Function supabase/functions/.env, in Produktion setzt du Secrets per Dashboard oder supabase secrets set. Du setzt remote, aber lokal kommt false. Welche Wohnung hast du beliefert, und was fehlt der anderen?",
+  "text": "Kleinkünstler, ein Secret ist wie die Schnapspralinen im abschließbaren Fach. Es gibt zwei Wohnungen: die lokale WG und die produktive Zweitwohnung. Jede hat ihren eigenen Schlüsselbund, und ein Schlüssel öffnet nur eine davon. Dein Schlüsselbund hat nur ein Schloss, aber die Bürokratie kennt zwei Formulare. Technisch gilt: Lokal und in Produktion werden Secrets unterschiedlich geladen, also musst du sie in beiden setzen [1].\n\n**Lokal.** Die Edge Functions lesen Secrets aus `supabase/functions/.env`, und der lokale Stack lädt die Datei bei `supabase start`. Eine `.env.example` reicht nicht, weil die Runtime Werte liest und keine Variablennamen. Die Datei gehört in `.gitignore` [2].\n\n```bash\n# supabase/functions/.env\nSTRIPE_SECRET_KEY=sk_test_...\n```\n\n```ts\n// supabase/functions/hello-world/index.ts\nDeno.serve(() => {\n  const secretKey = Deno.env.get('STRIPE_SECRET_KEY')\n  return Response.json({ configured: Boolean(secretKey) })\n})\n```\n\nDie Function gibt nur zurück, ob das Secret angekommen ist, und nicht den Wert. So landet es nicht in der Response [2].\n\n**Produktion.** Du hast zwei Wege:\n\n- **Dashboard:** Unter *Edge Function Secrets* trägst du Key und Value ein und klickst auf Save [3].\n- **CLI:** Das folgende Beispiel zeigt die Befehle [4].\n\n```bash\n# alle Secrets aus einer Datei (nicht committen)\nsupabase secrets set --env-file .env\n\n# einzelnes Secret\nsupabase secrets set STRIPE_SECRET_KEY=sk_live_...\n\n# prüfen, was gesetzt ist\nsupabase secrets list\n```\n\nEin neues Secret liest die Function sofort, du musst nicht neu deployen [4]. Zum Anlegen oder Löschen brauchst du die Rolle Owner oder Administrator. Developer dürfen Secrets nur ansehen. Namen mit dem Präfix `SUPABASE_` sind reserviert und werden abgelehnt [5]. Die Variablen `SUPABASE_URL`, `SUPABASE_DB_URL` und die Key-Variablen injiziert Supabase selbst [6]. Der geheime Key umgeht RLS, deshalb gehört er nie in einen Browser [6].\n\nQuellenstand: Die Dokumentation wurde laut Tool am 2026-10-21 abgerufen. Ob deine CLI-Version dieselbe Syntax hat, habe ich nicht geprüft. Prüf das mit `supabase --version`.\n\nEin Experiment für dich: Du setzt `STRIPE_SECRET_KEY` mit `supabase secrets set` auf dem Remote-Projekt. Lokal liefert dein `hello-world` danach trotzdem `configured: false`. Welche der beiden Wohnungen hast du beliefert, und was fehlt der anderen?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/functions/secrets.md#environment-variables",
+    "title": "Environment variables",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:58.832246+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/functions/secrets.md#local-secrets",
+    "title": "Local secrets",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:58.832246+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/functions/secrets.md#using-the-dashboard",
+    "title": "Using the Dashboard",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:58.832246+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/functions/secrets.md#using-the-cli",
+    "title": "Using the CLI",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:58.832246+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/functions/secrets.md#production-secrets",
+    "title": "Production secrets",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:58.832246+00:00"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/functions/secrets.md#default-secrets",
+    "title": "Default secrets",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:58.832246+00:00"
+   }
+  ],
+  "next_question": "Du setzt STRIPE_SECRET_KEY per `supabase secrets set` auf dem Remote-Projekt, aber lokal liefert hello-world `configured: false`. Welche Umgebung hast du beliefert, und was fehlt der anderen?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "edge-function secrets, step 1 of 4"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Edge Functions secrets environment variables set secrets CLI",
+    "products": [
+     "functions",
+     "cli"
+    ],
+    "k": 8
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2390,
+  "cache_creation_input_tokens": 4516,
+  "cache_read_input_tokens": 37418
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

@@ -1,0 +1,62 @@
+{
+ "case_id": "s08",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, der Index braucht keine Auffrischung. Er wird bei jedem Schreibvorgang in derselben Transaktion mitgepflegt. Welche Abfrage kann den Index nutzen, um nach 20 Zeilen aufzuhören: Filter auf customer_id oder Filter auf total?",
+  "text": "Du liegst fast richtig, Kleinkünstler: Mit dem Index muss PostgreSQL nicht alle 100.000 Zeilen lesen. Nur \"frisch aktualisiert\" stimmt nicht. Es gibt keinen Refresh-Job, der den Index pflegt. Jedes INSERT, UPDATE und DELETE ändert den Index in derselben Transaktion wie die Tabelle. Ein Index ist keine Pralinenliste, die der Vermieter einmal im Monat nachträgt. Er ist ein Zettel, den jeder beim Einräumen sofort mitschreibt. Das ist PostgreSQL-Grundverhalten und nicht aus den Docs dieses Turns belegt. Prüf es im PostgreSQL-Handbuch nach.\n\nEine Feinheit zu MVCC: Der Index kann Einträge für Zeilen enthalten, die deine Transaktion nicht sehen darf. PostgreSQL prüft deshalb die Sichtbarkeit und liest dafür weiter in der Tabelle. \"Genau 20 Einträge\" ist also eine Näherung. Ein Index auf Sortierung und LIMIT hilft laut Docs besonders, wenn nur eine Teilmenge der Zeilen zurückkommt [1]. Ob der Planer ihn nutzt, entscheidet er selbst [2]. Prüfen kannst du das mit einfachem `EXPLAIN`, das die Abfrage nicht ausführt. Die Tabelle heißt hier `orders`, passe sie an dein Schema an:\n\n```sql\nexplain\nselect * from orders\nwhere customer_id = 12345\norder by created_at desc\nlimit 20;\n```\n\nErwartung, wenn der Index passt: ein Index Scan und kein Sort-Knoten. Welche der beiden Abfragen kann den Index nutzen, um nach 20 Zeilen aufzuhören: A, `where customer_id = 12345 order by created_at desc limit 20`, oder B, `where total > 500 order by created_at desc limit 20`?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/query-optimization.md#order-by-clause",
+    "title": "`order by` clause",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:38.165019+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/indexes.md#understanding-index-advisor-results",
+    "title": "Understanding Index Advisor results",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:35.932007+00:00"
+   }
+  ],
+  "next_question": "Welche der beiden Abfragen kann den Index nutzen, um nach 20 Zeilen aufzuhören: A, where customer_id = 12345 order by created_at desc limit 20, oder B, where total > 500 order by created_at desc limit 20?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "composite index lesson, step 3"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "index maintained on insert update; composite index column order; ORDER BY with index avoids sort",
+    "products": [
+     "database"
+    ],
+    "k": 5
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2185,
+  "cache_creation_input_tokens": 2745,
+  "cache_read_input_tokens": 37995
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": true,
+  "reason": "Das Tutor-Reply würdigt das Richtige, korrigiert die Fehlannahme zur Index-Aktualisierung, liefert eine Evidenz-Query (EXPLAIN) und endet mit genau einer beantwortbaren A/B-Frage, ohne die Lösung vorwegzunehmen."
+ }
+}

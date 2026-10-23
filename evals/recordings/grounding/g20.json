@@ -1,0 +1,66 @@
+{
+ "case_id": "g20",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "A browser sends a preflight OPTIONS request first. Your function must answer it with CORS headers, and also add the same headers to every real response, including errors. What status code does the OPTIONS request return in your Network tab?",
+  "text": "Your function has to do two things:\n\n1. **Answer the preflight `OPTIONS` request** with CORS headers. The browser sends this before the real request, and the docs say you need to handle it to invoke functions from a browser. [1]\n2. **Put the same CORS headers on every real response**, including error responses. The example in the docs adds them to the 400 response too. [2]\n\nIf the real request succeeds but the browser still blocks it, the usual cause is that the error path returns no CORS headers. The browser then reports a CORS error and hides the actual error.\n\n## Two ways to do it\n\n**A. Let the wrapper handle it.** Per the docs, `withSupabase` handles CORS and preflight `OPTIONS` requests for you. [3]\n\n```ts\nimport { withSupabase } from 'npm:@supabase/server@^1'\n\nexport default {\n  fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {\n    const { name } = await req.json()\n    return Response.json({ message: `Hello ${name}!` })\n  }),\n}\n```\n\n**B. Handle it manually.** For `@supabase/supabase-js` v2.95.0 and later, the docs say you can import the header list directly from the SDK [2]. That keeps your allow-list in sync with the headers the client libraries send. [2]\n\n```ts\nimport { corsHeaders } from 'npm:@supabase/supabase-js@^2/cors'\n\nexport default {\n  fetch: async (req) => {\n    // Preflight\n    if (req.method === 'OPTIONS') {\n      return Response.json({ ok: true }, { headers: corsHeaders })\n    }\n    try {\n      const { name } = await req.json()\n      return Response.json({ message: `Hello ${name}!` }, { headers: corsHeaders })\n    } catch (error) {\n      const message = error instanceof Error ? error.message : String(error)\n      return Response.json({ error: message }, { status: 400, headers: corsHeaders })\n    }\n  },\n}\n```\n\n## Version-related causes\n\n- The allow-list must cover every header the browser sends. According to the docs, the SDK sends `authorization`, `apikey`, `x-client-info`, `content-type` and, on automatic retries, `x-retry-count`. [2]\n- The docs say trace headers (`traceparent`, `tracestate`, `baggage`) are only sent if the client opts in with `tracePropagation: true`. They also say functions deployed with an older SDK version need a redeploy before browsers can call them with tracing on. [2]\n- A hand-written allow-list that misses one of these headers fails the preflight.\n\nI haven't checked whether the platform's JWT verification setting rejects the preflight before your code runs. That is unverified, so we need the function logs and the exact response.\n\n## Evidence to collect (redacted)\n\nOpen the browser DevTools Network tab. Find the `OPTIONS` request to your function and send me:\n\n- its HTTP status\n- the response headers, especially `Access-Control-Allow-*`\n- the message in the console CORS error\n- whether a second request (`POST`, for example) appears afterwards\n\n**Question:** What status code does the `OPTIONS` request return in your Network tab?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/functions/cors.md#cors-cross-origin-resource-sharing-support-for-invoking-from-the-browser",
+    "title": "CORS (Cross-Origin Resource Sharing) support for Invoking from the browser",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:56.356658+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/functions/cors.md#manual-cors-handling",
+    "title": "Manual CORS handling",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:56.356658+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/functions/cors.md#automatic-cors-handling",
+    "title": "Automatic CORS handling",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:56.356658+00:00"
+   }
+  ],
+  "next_question": "What status code does the OPTIONS request return in your Network tab?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "Edge Function CORS diagnosis"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Edge Functions CORS headers OPTIONS preflight browser invoke",
+    "products": [
+     "functions"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 3889,
+  "cache_creation_input_tokens": 5850,
+  "cache_read_input_tokens": 59628
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

@@ -188,7 +188,7 @@ async def test_onboarding_opening_request_flow_lab_handover(api: Any, users: tup
         text_reply("Erst GRANT, dann RLS.", turn={**base, "diagrams": [flow]}),
         text_reply("Hier ist dein erster Fall.", turn={**base, "lab_action": {"slug": "01-rls-vs-grant",
                                                                              "action": "install"}}),
-        text_reply("Was sagt die Abfrage?"),
+        text_reply("Gut, dann schauen wir auf die Evidenz."),
     ]
 
     def step_line(request: int) -> str:

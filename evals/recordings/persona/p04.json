@@ -1,0 +1,60 @@
+{
+ "case_id": "p04",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "A GRANT gives a role a privilege, such as SELECT or INSERT, on a database object. RLS policies then decide which rows that operation can touch. A request failing with 42501 permission denied for table: which layer would you inspect first, and why?",
+  "text": "Understood. Neutral mode, no jokes.\n\n**What a GRANT is**\n\nA GRANT is a PostgreSQL statement that gives a role a specific privilege on a database object. Examples are `SELECT`, `INSERT`, `UPDATE` and `DELETE` on a table, or `USAGE` on a schema. Without the privilege, the operation fails with SQLSTATE `42501` (permission denied).\n\n```sql\n-- Lets the role \"authenticated\" read and insert rows in public.reports.\n-- It does not say which rows. That is the job of RLS policies.\ngrant select, insert on table public.reports to authenticated;\n```\n\n**GRANT vs. RLS in Supabase**\n\nPostgres runs two separate checks before a client touches a table. Grants decide whether a role can run an operation on the table at all. Policies decide which rows that operation applies to. [1]\n\nA missing grant raises `42501` before any policy runs. If a request fails that your policy should allow, check the grants before you change the policy. [1]\n\n**Supabase detail worth knowing**\n\nSupabase maps each API request to a Postgres role: `anon` for signed-out requests and `authenticated` for signed-in ones. [2] On existing projects, new tables in `public` start with every privilege granted to `anon`, `authenticated` and `service_role`. Not every project grants these automatically, so check your own project's defaults. [1] Adding RLS policies doesn't take those grants back. If you never revoke the grant, `anon` still has an insert path. [1]\n\nSources:\n- Observed in the docs: the quoted behaviour above. Retrieved 2026-10-21.\n- Not run in the lab: I haven't executed anything yet this session.\n\n**Question**\n\nA request to `public.reports` fails with `42501 permission denied for table reports`. Which layer, GRANT or RLS policy, would you inspect first, and why?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies",
+    "title": "Row Level Security: Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#authenticated-and-unauthenticated-roles",
+    "title": "Row Level Security: Authenticated and unauthenticated roles",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   }
+  ],
+  "next_question": "A request to public.reports fails with 42501 permission denied for table reports. Which layer, GRANT or RLS policy, would you inspect first, and why?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "GRANT vs RLS basics"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "GRANT privileges on table to role anon authenticated",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 5
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1324,
+  "cache_creation_input_tokens": 5007,
+  "cache_read_input_tokens": 37465
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

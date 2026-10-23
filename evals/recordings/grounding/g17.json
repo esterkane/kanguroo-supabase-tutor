@@ -1,0 +1,104 @@
+{
+ "case_id": "g17",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, kommt nicht an ist ein Symptom, kein Befund. Es kann an der Publication, an RLS, an der Subscription selbst oder an Quota liegen. Welchen Status liefert dein subscribe-Callback: SUBSCRIBED, CHANNEL_ERROR oder TIMED_OUT?",
+  "text": "Kleinkünstler, \"kommt nicht an\" ist wie \"der Kühlschrank ist leer\". Es kann sein, dass nie jemand eingekauft hat, dass die Tür abgeschlossen ist oder dass dein Mitbewohner alles gegessen hat. Wir brauchen erst Evidenz, dann Theorien. Die Behörde nennt das Ermittlungsverfahren, nur dass hier am Ende tatsächlich etwas herauskommt.\n\n**Hypothesenbaum nach Schicht (aus der Doku, noch nicht auf deinen Fall angewendet):**\n\n| Rang | Hypothese | Mechanismus | Quelle |\n|---|---|---|---|\n| 1 | Tabelle nicht in der Publication | Realtime sieht nur Tabellen in `supabase_realtime`. Eine neue Tabelle ist nicht automatisch dabei. [1] | Troubleshooting Step 1 |\n| 2 | RLS blockiert den Empfänger | Bei Tabellen mit RLS gehen Datensätze nur an Clients, die sie laut Policy lesen dürfen. [2] | Authorization |\n| 3 | Subscription kommt gar nicht zustande | Fehler beim Subscribe (Tabelle/Publication fehlt, Filter ungültig) kommen als Fehlermeldung zurück, der Channel bleibt offen. [3] | Protocol |\n| 4 | Projekt/Quota/Pause | Realtime auf Projektebene aus, nach Pause Slot nicht reconnected, oder das Limit \"Concurrent Peak Connections\" erreicht. [4] | Troubleshooting Step 7 |\n| 5 | Erwartung passt nicht zum Verhalten | Ohne `replica identity full` kommt kein vollständiges `old`. Bei DELETE greift RLS nicht, weil Postgres den Zugriff auf eine gelöschte Zeile nicht prüfen kann. [5] | Postgres Changes |\n\n```mermaid\nflowchart TD\n  A[Client subscribe] --> B{Status im Callback?}\n  B -->|CHANNEL_ERROR / TIMED_OUT| C[Verbindung, JWT, Quota]\n  B -->|SUBSCRIBED| D{Tabelle in Publication?}\n  D -->|nein| E[alter publication add table]\n  D -->|ja| F{RLS erlaubt SELECT für diesen Nutzer?}\n  F -->|nein| G[Policy / GRANT prüfen]\n  F -->|ja| H[Filter, Event-Typ, replica identity prüfen]\n```\n\nWas ich nicht weiß: ob du lokal oder gehostet arbeitest, welche SDK-Version du nutzt und wie dein `.on('postgres_changes', …)` aussieht. Deshalb habe ich bisher nichts getestet, und das Ranking ist nur eine Ausgangslage. Der erste Schritt im Baum entscheidet, welcher Ast überhaupt in Frage kommt:\n\n**Welchen Status liefert der Callback von `.subscribe((status, err) => …)` bei dir: `SUBSCRIBED`, `CHANNEL_ERROR`, `TIMED_OUT`, oder rufst du gar keinen Callback auf?** Wenn du das Ergebnis hier einfügst (ohne Keys und Tokens), geht es weiter. Ich schau derweil, ob noch Pralinen da sind.",
+  "diagrams": [
+   {
+    "id": "d1",
+    "kind": "flowchart",
+    "title": "Postgres Changes: Entscheidungsbaum",
+    "code": "flowchart TD\n  A[Client subscribe] --> B{Status im Callback?}\n  B -->|CHANNEL_ERROR / TIMED_OUT| C[Verbindung, JWT, Quota]\n  B -->|SUBSCRIBED| D{Tabelle in Publication?}\n  D -->|nein| E[alter publication add table]\n  D -->|ja| F{RLS erlaubt SELECT für diesen Nutzer?}\n  F -->|nein| G[Policy / GRANT prüfen]\n  F -->|ja| H[Filter, Event-Typ, replica identity prüfen]"
+   }
+  ],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/troubleshooting/realtime-postgres-changes-troubleshooting.md#step-1-is-the-table-in-the-realtime-publication",
+    "title": "Realtime: Postgres Changes Troubleshooting – Step 1",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:28.365434+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/realtime/authorization.md#interaction-with-postgres-changes",
+    "title": "Realtime Authorization – Interaction with Postgres Changes",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:27.116154+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/realtime/protocol.md#postgres-changes-subscription-errors",
+    "title": "Realtime Protocol – Postgres Changes subscription errors",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:42.089120+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/troubleshooting/realtime-postgres-changes-troubleshooting.md#step-7-is-realtime-enabled",
+    "title": "Realtime: Postgres Changes Troubleshooting – Step 7",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:28.365434+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/realtime/postgres-changes.md#receiving-old-records",
+    "title": "Postgres Changes – Receiving old records",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:46.205980+00:00"
+   }
+  ],
+  "next_question": "Welchen Status liefert der Callback von .subscribe((status, err) => ...) bei dir: SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, oder gibt es keinen Callback?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "Realtime Postgres Changes Hypothesenbaum, Schritt 1"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": [
+   "CITATION_UNUSED",
+   "QUESTION_NOT_IN_TEXT"
+  ]
+ },
+ "findings": [
+  "CITATION_UNUSED",
+  "QUESTION_NOT_IN_TEXT"
+ ],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Postgres Changes not receiving events publication supabase_realtime replica identity RLS",
+    "products": [
+     "realtime"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Realtime Postgres Changes troubleshooting enable replication for table",
+    "products": [
+     "realtime",
+     "kb"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 3051,
+  "cache_creation_input_tokens": 32061,
+  "cache_read_input_tokens": 37424
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

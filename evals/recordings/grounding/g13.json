@@ -1,0 +1,115 @@
+{
+ "case_id": "g13",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, das JWT ist ein ausgestellter Ausweis. Eigene Claims kommen über die Custom Access Token Hook rein, bevor das Token ausgestellt wird. Was ändert sich im Token, wenn du in der Rollentabelle eine Zeile von member auf admin setzt, während der User eingeloggt ist?",
+  "text": "Kleinkünstler, das JWT ist der Mieterausweis, den die Behörde ausstellt. Ein Eintrag, den du später in der Akte änderst, steht nicht auf dem Ausweis, den du schon im Portemonnaie hast. Technisch heißt das: Du schreibst Claims nicht selbst ins Token. Du hängst eine **Custom Access Token Hook** an Supabase Auth, und die läuft, bevor ein Token ausgestellt wird. Sie bekommt `user_id`, die bisherigen `claims` und die `authentication_method`, und sie gibt die geänderten Claims zurück [1]. Die Analogie hört dort auf, wo der Ausweis signiert ist und abläuft. Das Token ist kein lebendiger Datenbankeintrag.\n\n**Main path, Schritt 1 von 3: Hook bauen.** Das ist ein Minimalbeispiel für ein Lab. Es ist nach dem Muster der Doku gebaut, aber ich habe es nicht ausgeführt. Du brauchst eine Rollentabelle und eine Funktion `public.custom_access_token_hook(event jsonb) returns jsonb`.\n\n```sql\ncreate table public.user_roles (\n  user_id   uuid primary key references auth.users (id) on delete cascade,\n  user_role text not null default 'member'\n);\n\nalter table public.user_roles enable row level security;\n\ncreate or replace function public.custom_access_token_hook(event jsonb)\nreturns jsonb\nlanguage plpgsql\nstable\nas $$\ndeclare\n  claims jsonb;\n  v_role text;\nbegin\n  select ur.user_role into v_role\n  from public.user_roles ur\n  where ur.user_id = (event->>'user_id')::uuid;\n\n  claims := event->'claims';\n  claims := jsonb_set(claims, '{user_role}', to_jsonb(coalesce(v_role, 'member')));\n\n  return jsonb_set(event, '{claims}', claims);\nend;\n$$;\n\n-- Auth ruft die Hook als Rolle supabase_auth_admin auf\ngrant usage on schema public to supabase_auth_admin;\ngrant execute on function public.custom_access_token_hook to supabase_auth_admin;\nrevoke execute on function public.custom_access_token_hook from authenticated, anon, public;\n\n-- Tabellenzugriff nur für Auth. RLS ist an, daher braucht es auch eine Policy\ngrant select on table public.user_roles to supabase_auth_admin;\nrevoke all on table public.user_roles from authenticated, anon, public;\ncreate policy \"auth admin reads roles\"\n  on public.user_roles as permissive for select\n  to supabase_auth_admin using (true);\n```\n\nDie Grants sind kein Dekor. `supabase_auth_admin` hat keine Rechte im `public`-Schema, und die Funktion soll für `authenticated` und `anon` nicht über die Data API erreichbar sein [2]. Die Doku empfiehlt außerdem, kein `security definer` zu verwenden und stattdessen explizit zu granten [2]. Wenn RLS auf deiner Tabelle aktiv ist, muss eine Policy `supabase_auth_admin` zulassen [5]. Die Hook gibt `event` mit den geänderten Claims zurück. Die Pflicht-Claims (`iss`, `aud`, `exp`, `iat`, `sub`, `role`, `aal`, `session_id`, `email`, `phone`, `is_anonymous`) müssen drinbleiben, sonst lehnt Auth das Token ab [1].\n\n**Schritt 2: Hook aktivieren.** Gehosted geht das im Dashboard unter Auth → Hooks [5]. Für die lokale `config.toml` habe ich diese Runde keine Syntax abgerufen. Dieser Teil ist deshalb unverified, prüf ihn in der Doku zum Auth-Hooks-Setup, bevor du ihn glaubst.\n\n**Schritt 3: Claim in Policies nutzen.** Mit `(select auth.jwt() ->> 'user_role')` liest du den Claim in einer Policy. Zwei Sicherheitsregeln dazu:\n- Lege Autorisierungsdaten nie in `user_metadata`. Der eingeloggte User kann das selbst ändern. `app_metadata` kann er nicht ändern [3].\n- Ein JWT ist nicht immer aktuell. Änderungen kommen erst nach einem Token-Refresh an [3].\n\nDie Doku-Beispiele für einen Admin-Claim legen den Wert übrigens unter `app_metadata` ab [1]. Ein Top-Level-Claim wie `user_role` ist nach meinem Verständnis ebenfalls erlaubt. Eine Stelle, die genau das zusichert, habe ich nicht gefunden, also teste es im Lab, indem du das Token dekodierst.\n\nKleinkünstler, mach das. Ich schau derweil, ob noch Pralinen da sind. Vorhersage, keine Antwort aus dem Internet: Du änderst in `user_roles` eine Zeile von `'member'` auf `'admin'`, während der User eingeloggt ist. Ab wann steht `admin` im Token, und was müsste passieren, damit es dort ankommt?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook.md#custom-access-token-hook",
+    "title": "Custom Access Token Hook",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:05.310930+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/auth/auth-hooks.md#developing",
+    "title": "Auth Hooks > Developing",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:05.681912+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#helper-functions",
+    "title": "Row Level Security > Helper functions",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:21.009992+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/auth/jwts.md#introduction",
+    "title": "JSON Web Token (JWT) > Introduction",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:09.299605+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/auth/auth-hooks.md#security-model",
+    "title": "Auth Hooks > Security model",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:05.681912+00:00"
+   }
+  ],
+  "next_question": "Du änderst in user_roles eine Zeile von 'member' auf 'admin', während der User eingeloggt ist: Ab wann steht 'admin' im Token, und was müsste passieren, damit es dort ankommt?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "custom claims, step 1 of 3"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": [
+   "CITATION_UNUSED"
+  ]
+ },
+ "findings": [
+  "CITATION_UNUSED"
+ ],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Custom Access Token Hook add custom claims to JWT",
+    "products": [
+     "auth"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "custom claims RBAC user_role authorize function RLS policy",
+    "products": [
+     "auth",
+     "database"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "custom access token hook grant execute supabase_auth_admin revoke from authenticated anon public",
+    "products": [
+     "auth"
+    ],
+    "k": 5
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "user_metadata can be modified by user, do not use in RLS; app_metadata",
+    "products": [
+     "auth"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 6,
+  "output_tokens": 4422,
+  "cache_creation_input_tokens": 16587,
+  "cache_read_input_tokens": 64281
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

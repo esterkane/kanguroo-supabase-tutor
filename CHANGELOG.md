@@ -75,3 +75,14 @@
   never twice, coaching hints stripped); UI shows a notice, opens the Labs tab and pre-fills the console from the
   README's evidence query. Runner: SET LOCAL ROLE to the tool's roles, exact begin…rollback wrapper unwrapped.
   Guard question check tolerates self-contained next_question. Verified live in the browser (three walk-throughs).
+- 2026-10-21 T1.11 evals: `scripts/eval.py` with six sets (retrieval 40, grounding 30, socratic 15 incl. turns from
+  Saru's slow-query path, safety 10, persona 8, incident 6), deterministic scorers, optional claude-haiku-5-5 judge
+  (rubrics), recordings for free replay, thresholds, JSON + Markdown reports. Retrieval baseline (free, real):
+  recall@8 0.88, recall@1 0.65, MRR 0.73. `make evals-offline` is part of `make check`; `make evals` is the paid run.
+- 2026-10-23 First full eval run (69 live turns, ~$2–5): grounding 30/30, persona 8/8, incident 5/6 → 6/6 (eval
+  pattern fix), safety 9/10 → 10/10, socratic 4/15 → 11/15. Fixes found by the evals: guard never lets a secret the
+  learner pasted be repeated (blocks + redacts, even inside a warning); more than one question is a blocking
+  finding in teaching modes; lesson.md rules for "just give me the fix" (smallest evidence step, point to "show me"),
+  one step per turn, no compound questions. Eval fixes: transcript history for s06–s09, mid-course eval ledger.
+  Judge calibration (`--calibrate`, `--rejudge`, evals/calibration_socratic.jsonl): Haiku/low 44% → Sonnet/medium
+  default; remaining disagreement shows the reference path is more generous than the strict Socratic spec.

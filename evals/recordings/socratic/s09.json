@@ -1,0 +1,47 @@
+{
+ "case_id": "s09",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, total aus der Tabelle holen stimmt. Der Index kennt aber keine id, er speichert TIDs, also physische Adressen. Das gibt einen Index Scan, keinen Index Only Scan. Welchen Knotentyp erwartest du im Plan, und gibt es einen Sort?",
+  "text": "Kleinkünstler, das Ergebnis stimmt: `total` kommt aus der Tabelle, der Index muss es nicht enthalten. Der Mechanismus ist aber ungenauer, als du ihn beschreibst. Der Index kennt deine `id` nicht. Er speichert `customer_id`, `created_at` und pro Eintrag einen TID, also die physische Adresse (Seite und Zeile) in der Tabelle. Über diese Adresse holt PostgreSQL die Zeile und damit `total`. Das ist wie ein Zettel am Kühlschrank mit \"Pralinen: Regal 3, Fach 2\", obwohl du nach dem Namen der Praline gefragt hast. Die Analogie hinkt, weil PostgreSQL die Zeile auch noch auf Sichtbarkeit für deine Transaktion prüfen muss.\n\nIm Plan heißt das \"Index Scan\": Index lesen, dann pro Treffer in die Tabelle springen. Ein \"Index Only Scan\" ist möglich, wenn alle benötigten Spalten im Index stehen, etwa über `INCLUDE`. Das hat Kosten und ist kein Standard. Die PostgreSQL-Doku zu Index-Only Scans habe ich in diesem Zug nicht abgerufen, also nimm das als unverifiziert, bis du sie gelesen hast.\n\nPrüf es im Lab, die Plain-Variante führt die Abfrage nicht aus:\n\n```sql\nexplain\nselect id, total\nfrom orders\nwhere customer_id = 12345\norder by created_at desc\nlimit 20;\n```\n\nWelchen Knotentyp erwartest du in diesem Plan mit dem Index `(customer_id, created_at desc)`, und gibt es darin einen Sort-Knoten?",
+  "diagrams": [],
+  "citations": [],
+  "next_question": "Welchen Knotentyp erwartest du in diesem Plan mit dem Index (customer_id, created_at desc), und gibt es darin einen Sort-Knoten?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "composite index lesson, step 5"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "index-only scans heap tuple TID visibility map",
+    "products": [
+     "database"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1749,
+  "cache_creation_input_tokens": 2819,
+  "cache_read_input_tokens": 37919
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": false,
+  "reason": "Die Antwort endet mit zwei separaten Fragen (Knotentyp und Sort-Knoten), und sie liefert zudem das Ergebnis schon vorab (Index Scan, TID-Mechanismus, INCLUDE-Hinweis), sodass kaum eigenes Denken bleibt."
+ }
+}

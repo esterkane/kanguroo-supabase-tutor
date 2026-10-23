@@ -1,0 +1,137 @@
+{
+ "case_id": "i03",
+ "turn": {
+  "mode": "incident",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, zufällig ausgeloggt ist ein Symptom, keine Ursache. Ich habe fünf Hypothesen: Session-Grenzen, Refresh-Token-Wiederverwendung, globales signOut, zu kurze JWT-Zeit, Cookies. Welche genaue Fehlermeldung oder welchen Status liefert der Refresh-Request beim Logout?",
+  "text": "Kleinkünstler, \"zufällig ausgeloggt\" ist ein Symptom, keine Ursache. Der Vermieter sagt auch \"die Leitungen\", wenn der Strom weg ist. Ich fange mit dem Incident-Modell an und rate noch nichts.\n\n**Incident-Modell (vorläufig)**\n\n| Feld | Stand |\n|---|---|\n| Symptom | Nutzer verlieren ihre Session. Wie genau, ist offen: Login-Seite, 401 oder `AuthApiError`. |\n| Erwartet | Die Session bleibt aktiv, bis Nutzer sich abmelden oder eine konfigurierte Grenze greift |\n| Scope | unbekannt: alle oder einzelne Nutzer, Browser, Geräte, SSR oder SPA |\n| Zeitpunkt | unbekannt, vor allem: Was wurde direkt davor geändert |\n| Umgebung | unbekannt: gehostet oder lokal, Plan, SDK-Version, Framework |\n| Evidenz | noch keine |\n\n**Hypothesen, nach Wahrscheinlichkeit geordnet**\n\nDie Rangfolge ist vorläufig. Ich habe bisher keine Evidenz und stütze mich nur auf bekannte Mechanismen aus der Doku.\n\n1. **Konfigurierte Session-Grenzen.** Time-box, Inactivity timeout oder \"Single session per user\". Sie werden erst beim nächsten Refresh durchgesetzt. Die tatsächliche Dauer ist also Timeout plus JWT-Ablaufzeit. Das wirkt dann zufällig. Diese Optionen gibt es nur auf Pro-Plänen und höher [1]. Eine Änderung an diesen Einstellungen würde auch zum Zeitpunkt passen.\n2. **Refresh-Token-Wiederverwendung außerhalb der Ausnahmen.** Ein Refresh-Token darf nur einmal benutzt werden. Ausnahmen sind ein Reuse-Intervall (Standard 10 Sekunden) und der Fall, dass das Eltern-Token des aktiven Tokens verwendet wird. Greift keine Ausnahme, gilt die ganze Session als beendet und alle ihre Refresh-Tokens sind widerrufen [2]. Typische Auslöser sind SSR/Middleware, parallele Tabs oder ein fehlerhafter `onAuthStateChange`-Listener.\n3. **`signOut()` ohne `scope`.** Der Standard ist `global` und widerruft die Tokens aller Sessions dieses Nutzers, also auch anderer Tabs, Geräte und SSR-Kontexte [3].\n4. **Zu kurze JWT-Ablaufzeit oder Clock Skew.** Werte unter 5 Minuten, besonders unter 2, sind laut Doku problematisch. Das Gerät kann nach der Uhr falsch liegen, und der Client schafft es nicht mehr, vorzeitig zu erneuern [4].\n5. **Cookie- oder Browser-Ebene.** Ein `Max-Age` ist nicht die Session-Laufzeit. Die Doku warnt, dass ein zu kurzer Wert nur die Nutzererfahrung verschlechtert [5].\n\n**Wichtige Abgrenzung:** Die Doku sagt, dass abgelaufene Sessions nicht aktiv beendet, sondern erst nach 24 Stunden nach und nach bereinigt werden [6]. Ein Logout ist also nicht automatisch ein Server-Ereignis. Es kann auch der Client sein, der einen ungültigen Refresh-Token verwirft.\n\n**Nächste Evidenz**\n\nDie Hypothesen 1 bis 3 lassen sich mit einer Information trennen, nämlich mit der genauen Fehlermeldung beim Logout. Mögliche Meldungen wären zum Beispiel \"Invalid Refresh Token: Already Used\", \"Session expired\" oder gar keine, weil nur der Cookie fehlt. Die Meldung steht in der Browser-Konsole, im Netzwerk-Tab (Request an den Endpunkt `/auth/v1/token` mit `grant_type=refresh_token`, dazu Status und Body) und in den Auth-Logs im Dashboard. Bitte redigiert, ohne Tokens.\n\nIch habe nichts davon beobachtet. Das alles ist aus der Dokumentation abgeleitet.\n\nQuellen:\n- [1] https://supabase.com/docs/guides/auth/sessions.md#limiting-session-lifetime-and-number-of-allowed-sessions-per-user\n- [2] https://supabase.com/docs/guides/auth/sessions.md#what-is-refresh-token-reuse-detection-and-what-does-it-protect-from\n- [3] https://supabase.com/docs/guides/auth/server-side/advanced-guide.md#my-server-is-getting-invalid-refresh-token-errors-what-s-going-on\n- [4] https://supabase.com/docs/guides/auth/sessions.md#what-are-recommended-values-for-access-token-jwt-expiration\n- [5] https://supabase.com/docs/guides/auth/server-side/advanced-guide.md#should-i-set-a-shorter-max-age-parameter-on-the-cookies\n- [6] https://supabase.com/docs/guides/auth/sessions.md#how-to-ensure-an-access-token-jwt-cannot-be-used-after-a-user-signs-out\n\nWelche genaue Fehlermeldung oder welchen HTTP-Status liefert der Refresh-Request, wenn ein Nutzer ausgeloggt wird?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/sessions.md#limiting-session-lifetime-and-number-of-allowed-sessions-per-user",
+    "title": "Limiting session lifetime and number of allowed sessions per user",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:12.339798+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/auth/sessions.md#what-is-refresh-token-reuse-detection-and-what-does-it-protect-from",
+    "title": "What is refresh token reuse detection and what does it protect from?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:12.339798+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/auth/server-side/advanced-guide.md#my-server-is-getting-invalid-refresh-token-errors-what-s-going-on",
+    "title": "My server is getting invalid refresh token errors. What's going on?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:16.612506+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/auth/sessions.md#what-are-recommended-values-for-access-token-jwt-expiration",
+    "title": "What are recommended values for access token (JWT) expiration?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:12.339798+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/auth/server-side/advanced-guide.md#should-i-set-a-shorter-max-age-parameter-on-the-cookies",
+    "title": "Should I set a shorter Max-Age parameter on the cookies?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:16.612506+00:00"
+   },
+   {
+    "n": 6,
+    "url": "https://supabase.com/docs/guides/auth/sessions.md#how-to-ensure-an-access-token-jwt-cannot-be-used-after-a-user-signs-out",
+    "title": "How to ensure an access token (JWT) cannot be used after a user signs out",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:12.339798+00:00"
+   }
+  ],
+  "next_question": "Welche genaue Fehlermeldung oder welchen HTTP-Status liefert der Refresh-Request, wenn ein Nutzer ausgeloggt wird?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "incident: random logouts"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": {
+   "symptom": "Users are logged out seemingly at random; exact manifestation unknown",
+   "expected": "Session persists until sign-out or a configured limit",
+   "scope": "unknown",
+   "timeline": "unknown; need what changed before onset",
+   "environment": "unknown (hosted/local, plan, SDK version, framework, SSR vs SPA)",
+   "evidence": [],
+   "hypotheses": [
+    {
+     "h": "Session limits configured (time-box, inactivity timeout, single session per user), enforced at next refresh",
+     "rank": 1,
+     "test": "Check Auth settings > Sessions and compare auth.sessions rows/timestamps with logout times"
+    },
+    {
+     "h": "Refresh token reuse outside the reuse interval revokes the whole session (SSR/middleware, parallel tabs, buggy onAuthStateChange)",
+     "rank": 2,
+     "test": "Inspect refresh request status/body and Auth logs for already-used token errors"
+    },
+    {
+     "h": "signOut() called without scope defaults to global and revokes all sessions",
+     "rank": 3,
+     "test": "Grep code for signOut calls; check whether logouts correlate with another device/tab signing out"
+    },
+    {
+     "h": "JWT expiry too short or client clock skew",
+     "rank": 4,
+     "test": "Check JWT expiry setting and exp/iat claims versus device clock"
+    },
+    {
+     "h": "Cookie/browser storage issues",
+     "rank": 5,
+     "test": "Check cookie presence/attributes in the browser after logout"
+    }
+   ],
+   "root_cause": null,
+   "mitigation": null,
+   "permanent_fix": null,
+   "prevention": null,
+   "confidence": "low: no direct evidence yet"
+  },
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "users randomly logged out session expiry refresh token reuse",
+    "products": [
+     "auth",
+     "kb"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Auth sessions timebox inactivity timeout JWT expiry refresh token rotation",
+    "products": [
+     "auth"
+    ],
+    "k": 8
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 7857,
+  "cache_creation_input_tokens": 12164,
+  "cache_read_input_tokens": 64406
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

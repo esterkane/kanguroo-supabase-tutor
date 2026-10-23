@@ -1,0 +1,94 @@
+{
+ "case_id": "g01",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, GRANT ist der Haustürschlüssel, die Policy das Kühlschrankfach. Fehlt das Tabellenprivileg, kommt 42501, bevor eine Policy läuft. Szenario: RLS an, Policy erlaubt authenticated alles, aber select wurde entzogen. Was bekommt ein eingeloggter User: 42501, leeres Array oder alle Zeilen?",
+  "text": "Kleinkünstler, die Hausverwaltung hat dir zwar einen Haustürschlüssel ausgestellt, aber nicht den für die Speisekammer. Du stehst im Flur und der Hausmeister sagt \"Zugriff verweigert\", bevor er überhaupt nachsieht, was im Kühlschrank liegt. Wie so oft ist die Bürokratie hier ausnahmsweise logisch aufgebaut. Die Analogie hört da auf, wo es um Personen geht: Postgres prüft Rollen, nicht Menschen.\n\n**Technisch:** Postgres macht zwei getrennte Prüfungen. GRANTs entscheiden, ob eine Rolle eine Operation auf der Tabelle überhaupt ausführen darf. Policies entscheiden, auf welche Zeilen sich die Operation bezieht [1]. Ein fehlender GRANT löst `42501` aus, bevor irgendeine Policy läuft [1]. Bei einem API-Request steckt hinter der Meldung `permission denied for table …` also: Die Rolle, auf die der Request abgebildet wurde, hat für diese Operation kein Tabellenprivileg. Das ist `anon` ohne gültiges Login oder `authenticated` mit gültigem Login [2]. Die Doku sagt dazu: Wenn ein Request scheitert, den deine Policy erlauben sollte, prüfe zuerst die Grants und ändere erst danach die Policy [1]. PostgREST liefert dabei laut Doku einen Hint mit, der das nötige `GRANT` nennt [3].\n\n```json\n{\n  \"code\": \"42501\",\n  \"message\": \"permission denied for table your_table\",\n  \"hint\": \"Grant the required privileges to the current role with: GRANT SELECT ON public.your_table TO anon;\"\n}\n```\n\nWelche Grants eine Rolle hat, siehst du mit dieser Abfrage. Sie ist read-only und braucht keinen Rollback [4]:\n\n```sql\nselect grantee, privilege_type\nfrom information_schema.role_table_grants\nwhere table_name = 'your_table';\n```\n\nErwartet wird eine Zeile pro Rolle und Privileg. Fehlt dort z. B. `authenticated` / `SELECT`, hast du die Ursache gefunden.\n\nZwei Einschränkungen, damit du nichts Falsches mitnimmst:\n- **Nicht jedes Projekt hat dieselben Default-Grants.** Die Doku sagt, dass bei bestehenden Projekten neue Tabellen in `public` alle Privilegien für `anon`, `authenticated` und `service_role` bekommen. Sie sagt auch, dass nicht jedes Projekt das automatisch macht [1]. Verlass dich also nicht auf \"wird schon gegrantet sein\", sondern schau nach.\n- **Ein Grant ist kein Freifahrtschein.** Er macht die Tabelle über die Data API erreichbar. Deshalb gehört RLS mit passenden Policies dazu [4]. Wer bei `42501` einfach `grant all … to anon` ausführt, hat das Symptom beseitigt und ein Sicherheitsloch aufgemacht.\n\nDein erster Test, Kleinkünstler: Eine Tabelle hat RLS aktiviert und eine Policy `to authenticated using (true)`. Jemand hat aber `select` für `authenticated` per `revoke` entzogen. Ein eingeloggter User fragt die Tabelle über die API ab. Bekommt er `42501`, ein leeres Array oder alle Zeilen? Tipp deine Antwort und sag mir in einem Satz, welche Prüfung deiner Meinung nach zuerst greift.",
+  "diagrams": [
+   {
+    "id": "d1",
+    "kind": "flowchart",
+    "title": "Wo 42501 entsteht",
+    "code": "flowchart TD\n  A[Client-Request mit API-Key/JWT] --> B[PostgREST wählt Rolle: anon oder authenticated]\n  B --> C{Hat die Rolle das Tabellenprivileg?}\n  C -- nein --> D[42501 permission denied for table]\n  C -- ja --> E{RLS aktiv?}\n  E -- ja --> F[Policies filtern Zeilen]\n  E -- nein --> G[alle Zeilen für diese Operation]\n  F --> H[Ergebnis]\n  G --> H"
+   }
+  ],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#grants-and-policies",
+    "title": "Row Level Security > Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:21.009992+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#authenticated-and-unauthenticated-roles",
+    "title": "Row Level Security > Authenticated and unauthenticated roles",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:21.009992+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/api/securing-your-api.md#grant-access-explicitly",
+    "title": "Securing your API > Grant access explicitly",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:06.664807+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/troubleshooting/database-api-42501-errors.md#missing-table-level-privileges",
+    "title": "Database API 42501 errors > Missing table-level privileges",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08.433678+00:00"
+   }
+  ],
+  "next_question": "RLS ist an, die Policy erlaubt authenticated alles, aber SELECT wurde per revoke entzogen: Bekommt ein eingeloggter User 42501, ein leeres Array oder alle Zeilen, und welche Prüfung greift zuerst?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "request flow lesson, step 1: GRANT vs RLS"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "42501 permission denied for table Data API grants",
+    "products": [
+     "database",
+     "api",
+     "kb"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Row Level Security vs GRANT privileges anon authenticated roles PostgREST",
+    "products": [
+     "database",
+     "auth",
+     "security"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 3152,
+  "cache_creation_input_tokens": 65483,
+  "cache_read_input_tokens": 18929
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

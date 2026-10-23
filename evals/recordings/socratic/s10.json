@@ -1,0 +1,74 @@
+{
+ "case_id": "s10",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, alles auf einmal ist Hausverwaltung. Wir machen Etappen. Erste Etappe: die vier Wege zur Datenbank und ihre IP-Versionen. Du bist auf Free, dein Netz kann nur IPv4. Welche Endpunkte erreichst du?",
+  "text": "Kleinkünstler, \"alles auf einmal\" ist die Arbeitsweise der Hausverwaltung: ein Formular für alles, am Ende versteht keiner etwas. Wir gehen in Etappen vor. Heute ist Etappe 1 von 4: **welche Wege zur Datenbank es gibt und wer sie über IPv4 oder IPv6 erreicht**. Danach folgen Modi, Prepared Statements und Fehlersuche.\n\nEs gibt vier Endpunkte, und jeder hat seine eigene Tür. Dass die Tür zur Datenbank auf Free nur IPv6 spricht, ist bürokratisch, aber dokumentiert [1]:\n\n| Endpunkt | Port | Free | Paid | Paid + IPv4-Add-on |\n|---|---|---|---|---|\n| Direkt | 5432 | IPv6 | IPv6 | IPv4 |\n| Shared Pooler (Supavisor), Session | 5432 | IPv4 | IPv4 | IPv4 |\n| Shared Pooler (Supavisor), Transaction | 6543 | IPv4 | IPv4 | IPv4 |\n| Dedizierter Pooler (PgBouncer), Transaction | 6543 | – | IPv6 | IPv4 |\n\nDer Shared Pooler ist auf jedem Plan nur IPv4 [2]. Der Port 6543 gehört je nach Host zu Supavisor oder PgBouncer [1].\n\nDie Analogie hört hier auf: Anders als bei der Post kommt nicht jeder Brief an jeder Tür an. Das entscheidet dein Netzwerk, nicht Postgres.\n\nAngenommen, du bist auf dem Free-Plan und dein Heimnetz kann nur IPv4, wie in der Tabelle oben [1]. Welche Endpunkte erreichst du dann?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/connecting-to-postgres.md#endpoints-and-ip-versions-endpoints-and-ip-versions",
+    "title": "Endpoints and IP versions",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:54:46.793099+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/connecting-to-postgres/pooling-and-limits.md#shared-and-dedicated-poolers-shared-pooler",
+    "title": "Shared and dedicated poolers",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:28.205428+00:00"
+   }
+  ],
+  "next_question": "Angenommen, du bist auf dem Free-Plan und dein Heimnetz kann nur IPv4, wie in der Tabelle oben. Welche Endpunkte erreichst du dann?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "Pooling-Etappe 1 von 4: Endpunkte und IP-Versionen"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Supavisor connection modes session transaction pooler direct connection IPv6",
+    "products": [
+     "database",
+     "platform"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "prepared statements transaction mode pooler",
+    "products": [
+     "database",
+     "kb"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 8,
+  "output_tokens": 3284,
+  "cache_creation_input_tokens": 9099,
+  "cache_read_input_tokens": 63767
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": true,
+  "reason": "Der Tutor begrenzt die überladene Anfrage auf Etappe 1, erklärt Mechanismus und Tabelle (erlaubt), löst die Lernaufgabe aber nicht vorweg und endet mit genau einer beantwortbaren Frage, sodass der Lernende die Schlussfolgerung selbst ziehen muss."
+ }
+}

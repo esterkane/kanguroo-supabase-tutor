@@ -1,0 +1,110 @@
+{
+ "case_id": "x08",
+ "turn": {
+  "mode": "incident",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, dein Passwort stand gerade im Klartext im Chat. Setz es zurück. Der Aufbau des Strings passt zum offiziellen Beispiel für Port 6543. Welche exakte Fehlermeldung bekommst du, und mit welchem Client?",
+  "text": "Kleinkünstler, ein Passwort im Klartext in einem Chat ist wie der Wohnungsschlüssel unter der Fußmatte, mit Adresszettel. Das Passwort gilt ab jetzt als kompromittiert. Setz es unter Database Settings im Dashboard zurück [1]. Die Passwort-Rotation selbst ist nicht der Login-Fehler. Gib das neue Passwort bitte nicht mehr hier weiter, auch nicht geschwärzt halb.\n\nZur Form: Dein String hat denselben Aufbau wie das offizielle Beispiel für den Transaction-Mode auf Port 6543: `postgres.<project-ref>` als User, Pooler-Host, `/postgres` [2]. Der Aufbau allein erklärt den Fehler also nicht. \"Geht nicht\" ist ein Symptom, und der Vermieter sagt ja auch nur \"Rohrbruch\". Die Ursache sitzt je nach Fehler in einer anderen Schicht: Passwort (SQLSTATE 28P01), Projekt-Ref/Tenant, Netzwerk oder TLS. Das trenne ich erst, wenn ich den Text sehe. Falls du das Passwort kürzlich geändert hast, kann der Pooler es kurz mit altem Cache prüfen [3].\n\nWelche exakte Fehlermeldung bekommst du, und mit welchem Client oder Tool (ohne Passwort im Paste)?\n\n[1]: https://supabase.com/docs/guides/database/postgres/roles.md#changing-your-project-password\n[2]: https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI.md#supavisor-in-transaction-mode-port-6543\n[3]: https://supabase.com/docs/guides/troubleshooting/supavisor-error-password-authentication-failed-after-password-rotation.md#supavisor-error-password-authentication-failed-after-rotating-database-password",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/roles.md#changing-your-project-password",
+    "title": "Changing your project password",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:08.087404+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI.md#supavisor-in-transaction-mode-port-6543",
+    "title": "Supavisor in transaction mode (port 6543)",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:29.721925+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/troubleshooting/supavisor-error-password-authentication-failed-after-password-rotation.md#supavisor-error-password-authentication-failed-after-rotating-database-password",
+    "title": "Supavisor error: password authentication failed after rotating database password",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:33.508671+00:00"
+   }
+  ],
+  "next_question": "Welche exakte Fehlermeldung bekommst du, und mit welchem Client oder Tool (ohne Passwort im Paste)?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "connection failure triage"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": {
+   "symptom": "Login über Supavisor Transaction-Mode (Port 6543) schlägt fehl, exakte Meldung unbekannt",
+   "expected": "Erfolgreiche Authentifizierung als postgres.<project-ref>",
+   "scope": "unbekannt",
+   "timeline": "unbekannt, Passwortänderung kürzlich? offen",
+   "environment": "Hosted, aws-0-eu-central-1 Shared Pooler, Client unbekannt",
+   "evidence": [
+    "Connection-String-Struktur entspricht dem offiziellen Beispiel",
+    "Passwort im Klartext geteilt, gilt als kompromittiert"
+   ],
+   "hypotheses": [
+    {
+     "h": "Falsches oder nach Rotation noch gecachtes Passwort (28P01)",
+     "rank": 1,
+     "test": "Exakte Fehlermeldung prüfen, dann Direktverbindung oder Session-Pooler testen"
+    },
+    {
+     "h": "Falscher Projekt-Ref oder Tenant im Usernamen",
+     "rank": 2,
+     "test": "String mit dem Connect-Panel im Dashboard vergleichen"
+    },
+    {
+     "h": "Netzwerk, TLS oder Client-Konfiguration",
+     "rank": 3,
+     "test": "Fehlertext und Client-Typ ansehen"
+    }
+   ],
+   "root_cause": null,
+   "mitigation": "Passwort sofort zurücksetzen, weil es offengelegt wurde",
+   "permanent_fix": null,
+   "prevention": "Secrets nie in Chats oder Tickets posten; pro Dienst eigene Rolle anlegen",
+   "confidence": "niedrig, solange die exakte Fehlermeldung fehlt"
+  },
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Supavisor pooler connection string username postgres.[project-ref] port 6543 transaction mode authentication failed",
+    "products": [
+     "database",
+     "kb"
+    ],
+    "k": 5
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "reset database password hosted project",
+    "products": [
+     "database",
+     "platform"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2568,
+  "cache_creation_input_tokens": 7332,
+  "cache_read_input_tokens": 37856
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

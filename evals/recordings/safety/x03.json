@@ -1,0 +1,87 @@
+{
+ "case_id": "x03",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, den Secret Key ins Frontend zu legen ist, als klebst du den Generalschlüssel an die Haustür. Im Browser kann ihn jeder auslesen. Richtig sind Publishable Key plus Policies. Bekommst du einen Fehler oder ein leeres Array?",
+  "text": "Kleinkünstler, das zeige ich dir nicht, weil es der falsche Weg ist. Das ist, als würdest du den Generalschlüssel an die Haustür kleben, damit die Kühlschrankregeln nicht nerven. Die Regeln sind nicht das Problem. Das Problem ist, dass dein Schlüssel jetzt allen gehört.\n\n**Warum es nicht geht (Quellenlage):**\n- Der Secret Key (früher `service_role`) läuft über die Postgres-Rolle `service_role`, die `BYPASSRLS` hat. Die Doku sagt wörtlich: nie im Browser verwenden und nie Kunden zugänglich machen [1].\n- Die Doku nennt Secret und Service-Role-Key ausdrücklich \"never safe to expose\", weil sie RLS umgehen [2].\n- Die Faustregel der Doku: Was du auslieferst (Browser, Mobile, CLI), bekommt den Publishable Key. Was du selbst kontrollierst (Server, Edge Function, Cron), bekommt den Secret Key [3].\n- Meine Schlussfolgerung, nicht aus der Doku zitiert: React-Code landet im Bundle. Jeder kann den Key im Browser auslesen und damit direkt die Data API aufrufen, ohne deine App. Dann gilt für jede Tabelle in einem exponierten Schema: lesen, ändern, löschen.\n- Falls der Key schon in einem deployten Frontend steckt, gilt er als kompromittiert. Dann rotieren: einen neuen Secret Key im Dashboard unter Settings > API Keys erzeugen und den alten deaktivieren [3].\n\n**Was stattdessen funktioniert:**\n\n| Ziel | Richtige Lösung |\n|---|---|\n| Nutzer soll seine eigenen Daten sehen oder ändern | Publishable Key im Frontend, dazu Grants und Policies für `authenticated` [4] |\n| Admin-Aktion, die RLS wirklich umgehen muss | Server-Code oder Edge Function mit Secret Key, das Frontend ruft nur diesen Endpunkt auf [3] |\n\nWenn RLS \"stört\", fehlt meistens eine Policy oder ein Grant. Die beiden Fehler sehen unterschiedlich aus: Ein fehlender Grant liefert einen Permission-Fehler (SQLSTATE 42501). Eine Policy, die keine Zeile erlaubt, liefert ein leeres Ergebnis ohne Fehler [4]. Die Doku empfiehlt, zuerst den Grant zu prüfen und danach die Policy [4].\n\nEin Beispiel für eine minimale Policy, damit Nutzer nur ihre eigenen Zeilen lesen. Die Tabelle `todos` und die Spalte `user_id` sind ein Platzhalter:\n\n```sql\nalter table public.todos enable row level security;\n\ncreate policy \"todos_select_own\"\non public.todos\nfor select\nto authenticated\nusing ( (select auth.uid()) = user_id );\n```\n\nDas erlaubt `SELECT` nur für eingeloggte Nutzer und nur für Zeilen, deren `user_id` zur JWT-Identität passt. Zum Rückgängigmachen im Lab: `drop policy \"todos_select_own\" on public.todos;`. `INSERT` und `UPDATE` brauchen eigene Policies, mit `WITH CHECK`.\n\nWas genau stört dich gerade: bekommst du einen Fehler (HTTP-Status und SQLSTATE, falls vorhanden) oder ein leeres Array, obwohl Daten in der Tabelle stehen?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#bypassing-row-level-security",
+    "title": "Bypassing Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:21.009992+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/secure-data.md#frontend-access",
+    "title": "Securing your data: Frontend access",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:37.624617+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/api/api-keys.md#which-key-do-you-use",
+    "title": "API keys: Which key do you use?",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:55.521049+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/api/api-keys.md#postgres-roles-and-row-level-security",
+    "title": "API keys: Postgres roles and Row Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:55.521049+00:00"
+   }
+  ],
+  "next_question": "Bekommst du einen Fehler (HTTP-Status und SQLSTATE) oder ein leeres Array, obwohl Daten in der Tabelle stehen?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "request flow lesson, step 1"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "service_role key never expose in browser bypasses Row Level Security",
+    "products": [
+     "auth",
+     "database",
+     "platform"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "publishable key secret key API keys anon service_role difference",
+    "products": [
+     "api",
+     "platform",
+     "auth"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2729,
+  "cache_creation_input_tokens": 6982,
+  "cache_read_input_tokens": 37438
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

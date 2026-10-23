@@ -1,0 +1,36 @@
+{
+ "case_id": "s11",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, Raten ist gerade nicht dein Ding, verstanden. Aber ich sehe keine offene Frage und kein aktives Lab, also fehlt mir die Frage zur Antwort. Sag show me für die komplette Lösung. Welche Aufgabe oder welchen Fehler meinst du?",
+  "text": "Kleinkünstler, Raten ist nur dann Pädagogik, wenn es sich lohnt. Bei dir lohnt es sich gerade nicht, das akzeptiere ich. Das Problem ist ein anderes: Ich sehe in dieser Sitzung weder eine offene Frage noch ein aktives Lab. Die Antwort kenne ich also nicht, weil mir die Frage fehlt. Das Formular ohne Feld ist Bürokratie in Reinform, und ich bin nicht beteiligt.\n\nDu hast zwei Abkürzungen:\n\n- **\"show me\"** zeigt dir die Lösung des aktuellen Schritts komplett, ohne Ratespiel.\n- **\"neutral\"** schaltet mich auf knappe Erklärungen ohne Känguru.\n\nBeides funktioniert aber erst, wenn ich weiß, wovon wir reden. Schreib mir einen Satz dazu: die Fehlermeldung, die Aufgabe oder das Lab, bei dem du hängst. Wenn du einen SQLSTATE oder HTTP-Status hast, nimm den dazu.\n\nWelche Aufgabe oder welchen Fehler meinst du mit \"die Antwort\"?",
+  "diagrams": [],
+  "citations": [],
+  "next_question": "Welche Aufgabe oder welchen Fehler meinst du mit \"die Antwort\"?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "Sitzungsstart, Ziel noch offen"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [],
+ "usage": {
+  "input_tokens": 2,
+  "output_tokens": 1313,
+  "cache_creation_input_tokens": 791,
+  "cache_read_input_tokens": 18507
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": true,
+  "reason": "The tutor has no active problem to solve, so it reveals no solution, explains that \"show me\" reveals the solution, asks the learner to describe the task, and ends with exactly one answerable question."
+ }
+}

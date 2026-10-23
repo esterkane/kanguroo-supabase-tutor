@@ -1,0 +1,84 @@
+{
+ "case_id": "g16",
+ "turn": {
+  "mode": "neutral",
+  "language": "en",
+  "persona_on": false,
+  "speech": "The error means no RLS policy on storage.objects allowed the write. Besides a missing or too-narrow INSERT policy, upsert true also needs SELECT and UPDATE. Does your upload set upsert true, and what SELECT policies exist for that bucket?",
+  "text": "The error means Postgres rejected a write to `storage.objects` because no RLS policy allowed it. Storage keeps object metadata in `storage.objects`, and RLS on that table decides who may upload. [1] Without matching policies, Storage allows no uploads. [1]\n\n## Common causes, most likely first\n\n| # | Cause | Why it fails | Fix |\n|---|---|---|---|\n| 1 | No `INSERT` policy on `storage.objects` | Uploading needs an `INSERT` policy. [1] | Add an `INSERT` policy with a `WITH CHECK` clause. |\n| 2 | `INSERT` policy exists, but the `WITH CHECK` condition is false for this path | Typical mismatches are the wrong `bucket_id`, a folder prefix that doesn't match, or a role the policy doesn't cover (`to authenticated` versus an anon request). [2] | Compare the actual `bucket_id` and `name` with the policy expression. Check which role the request used. |\n| 3 | `upsert: true` without a matching `SELECT` (and `UPDATE`) policy | The docs say overwriting needs `SELECT` and `UPDATE` in addition to `INSERT`. [1] The KB article says upsert runs `INSERT ... ON CONFLICT` with `RETURNING *`. A missing `SELECT` policy then fails the whole transaction with this 403. [3] | Set `upsert: false` if you don't need overwrites. Otherwise add a `SELECT` policy that mirrors the `INSERT` policy. [3] |\n| 4 | Unauthenticated request, or the wrong identity | Policies like `to authenticated` or `auth.jwt()->>'sub'` don't match an anon request. A folder name derived from `auth.uid()` is also wrong if the user isn't signed in. | Confirm the client has a session when it uploads. |\n\nCause 3 is the one people miss. The error text says \"new row\", which suggests an `INSERT` problem. Your `INSERT` policy can be correct and the upload can still fail. [3]\n\n## Example policies\n\nThis is the documented pattern for per-user folders. It allows `INSERT` for authenticated users into a folder named after their ID:\n\n```sql\ncreate policy \"Allow authenticated uploads\"\non storage.objects\nfor insert\nto authenticated\nwith check (\n  bucket_id = 'my_bucket_id' and\n  (storage.foldername(name))[1] = (select auth.jwt()->>'sub')\n);\n```\n\nFor overwrites, add matching `SELECT` and `UPDATE` policies. The docs' copy/move page shows `select` and `update` policies keyed on `owner_id`. [4]\n\nThese are policy changes to `storage.objects`. They don't touch your data. Test them in a non-production project first. To roll one back, run `drop policy \"<name>\" on storage.objects;`.\n\n## What I haven't verified\n\nI haven't seen your policy, bucket name, upload path or SDK call. The table above lists candidate causes, not a diagnosis. Which one applies depends on evidence I don't have yet.\n\nSources, all Tier 1 official Supabase docs, fetched 2026-10-21:\n- [1] [Storage Access Control: Access policies](https://supabase.com/docs/guides/storage/security/access-control.md#access-policies)\n- [2] [Storage Access Control: Policy examples](https://supabase.com/docs/guides/storage/security/access-control.md#policy-examples)\n- [3] [KB: Storage error 403 \"new row violates row-level security policy\" on upload](https://supabase.com/kb/troubleshooting/storage-error-403-forbidden-new-row-violates-row-level-security-policy-on-upload.md#storage-error-403-forbidden-new-row-violates-row-level-security-policy-on-upload)\n- [4] [Copy Objects: Permissions](https://supabase.com/docs/guides/storage/management/copy-move-objects.md#permissions)\n\n**Question:** Does your upload call set `upsert: true`? If it does, what `SELECT` policies exist on `storage.objects` for that bucket?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/storage/security/access-control.md#access-policies",
+    "title": "Storage Access Control: Access policies",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:23.732128+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/storage/security/access-control.md#policy-examples",
+    "title": "Storage Access Control: Policy examples",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:23.732128+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/kb/troubleshooting/storage-error-403-forbidden-new-row-violates-row-level-security-policy-on-upload.md#storage-error-403-forbidden-new-row-violates-row-level-security-policy-on-upload",
+    "title": "Storage error: 403 Forbidden: 'new row violates row-level security policy' on upload",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:49.397126+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/storage/management/copy-move-objects.md#permissions",
+    "title": "Copy Objects: Permissions",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:05.800143+00:00"
+   }
+  ],
+  "next_question": "Does your upload call set upsert: true, and if so, what SELECT policies exist on storage.objects for that bucket?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "Storage RLS troubleshooting, step 1"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Storage upload new row violates row-level security policy storage.objects INSERT policy",
+    "products": [
+     "storage"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Storage access control upsert requires SELECT UPDATE policy",
+    "products": [
+     "storage",
+     "kb"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2358,
+  "cache_creation_input_tokens": 6989,
+  "cache_read_input_tokens": 37323
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

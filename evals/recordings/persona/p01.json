@@ -1,0 +1,60 @@
+{
+ "case_id": "p01",
+ "turn": {
+  "mode": "neutral",
+  "language": "de",
+  "persona_on": false,
+  "speech": "Ein GRANT erlaubt einer Rolle eine Operation auf einem Objekt. RLS-Policies begrenzen danach die Zeilen. Eine Tabelle hat eine passende Select-Policy, der angemeldete Nutzer bekommt trotzdem 42501. Welche Prüfung ist wahrscheinlich das Problem?",
+  "text": "Neutraler Modus.\n\n**GRANT** ist ein PostgreSQL-Befehl. Er erlaubt einer Rolle, eine bestimmte Operation auf einem Objekt auszuführen, zum Beispiel `SELECT` auf einer Tabelle.\n\n```sql\ngrant select on table public.announcements to anon;\n```\n\nBei Supabase wird jede API-Anfrage einer Postgres-Rolle zugeordnet. Das ist `anon` für nicht angemeldete und `authenticated` für angemeldete Nutzer [1]. Ohne passendes GRANT scheitert die Operation mit SQLSTATE `42501`, bevor eine Policy geprüft wird [2].\n\n**GRANT und RLS sind zwei getrennte Prüfungen** [2]:\n\n| Prüfung | Frage |\n|---|---|\n| GRANT | Darf diese Rolle die Operation auf der Tabelle überhaupt ausführen? |\n| RLS-Policy | Auf welche Zeilen darf sich die Operation beziehen? |\n\nNeue Tabellen in `public` bekommen bei bestehenden Projekten automatisch alle Rechte für `anon`, `authenticated` und `service_role`. Nicht jedes Projekt vergibt sie automatisch [2]. Policies nehmen diese Grants nicht zurück. Eine Tabelle, die nur durch Policies geschützt ist, kann also trotzdem Schreibzugriff für `anon` offen lassen, wenn du den Grant nie entziehst [2].\n\nEine Frage, du kannst kurz antworten:\n\nEine Tabelle hat RLS aktiviert und eine passende `select`-Policy für `authenticated`. Ein angemeldeter Nutzer bekommt trotzdem `42501`. Welche der beiden Prüfungen ist am wahrscheinlichsten das Problem?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#authenticated-and-unauthenticated-roles",
+    "title": "Authenticated and unauthenticated roles",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies",
+    "title": "Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   }
+  ],
+  "next_question": "Eine Tabelle hat RLS aktiviert und eine passende select-Policy für authenticated, ein angemeldeter Nutzer bekommt trotzdem 42501. Welche der beiden Prüfungen ist am wahrscheinlichsten das Problem?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "GRANT vs RLS basics"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "GRANT privileges roles anon authenticated table permissions RLS",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 5
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1496,
+  "cache_creation_input_tokens": 4357,
+  "cache_read_input_tokens": 37473
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

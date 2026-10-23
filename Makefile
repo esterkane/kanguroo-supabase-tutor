@@ -79,10 +79,20 @@ test-labs: env ## every lab's checks.sql must FAIL on fresh setup and PASS after
 lint: ## ruff + mypy
 	uv run ruff check . && uv run mypy backend scripts
 
-check: ## lint + all tests (needs the stack running for pgTAP)
-	$(MAKE) lint && uv run pytest -q && $(MAKE) test-db && cd frontend && npm run -s typecheck && npm run -s test -- --run
+check: ## lint + all tests (needs the stack running for pgTAP); evals: free retrieval + replayed recordings
+	$(MAKE) lint && uv run pytest -q && $(MAKE) test-db && $(MAKE) evals-offline && \
+	  cd frontend && npm run -s typecheck && npm run -s test -- --run
 
-evals: ## full eval suite (uses API tokens)
-	$(PY) scripts/eval.py --all
+evals-offline: env ## retrieval eval (local, enforced) + re-score recorded turns (report only); no API tokens
+	@$(WITH_ENV) $(PY) scripts/eval.py --sets retrieval --strict --if-ready | grep -E '^## |Thresholds'
+	@$(WITH_ENV) $(PY) scripts/eval.py --sets grounding socratic safety persona incident --replay --if-ready \
+	  | grep -E '^## '
 
-.PHONY: help env seed up down reset olist dev-user ingest search turn refresh dev smoke test-db test-labs lint check evals
+eval-calibrate: env ## judge agreement with labelled turns (reference path = pass); a few judge calls
+	$(WITH_ENV) { [ -f .env ] && set -a && . ./.env && set +a; true; } && $(PY) scripts/eval.py --calibrate
+
+evals: env ## full eval suite: 69 live tutor turns + judge, records them (uses API tokens, ~$2-5)
+	$(WITH_ENV) { [ -f .env ] && set -a && . ./.env && set +a; true; } && \
+	  $(PY) scripts/eval.py --all --record --judge --strict
+
+.PHONY: help env seed up down reset olist dev-user ingest search turn refresh dev smoke test-db test-labs lint check evals evals-offline eval-calibrate

@@ -1,0 +1,82 @@
+{
+ "case_id": "g09",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, DELETE räumt nicht auf, es macht Zeilen nur unsichtbar. Vacuum gibt den Platz zur Wiederverwendung frei, nicht zwingend ans Betriebssystem, und die Cloud-Disk schrumpft sowieso nicht von allein. Nach einer Million gelöschter Zeilen und normalem Autovacuum: Sinkt die Datenbankgröße deutlich, und warum?",
+  "text": "Kleinkünstler, stell dir vor, du wirfst 100 Pralinenschachteln aus dem Kühlschrank. Der Kühlschrank wird dadurch nicht kleiner, und die WG-Wohnung auch nicht. Die Fächer sind nur frei für neue Pralinen. Der Vermieter baut dir keine kleinere Wohnung, nur weil du aufgeräumt hast. Die Analogie hört da auf, wo PostgreSQL die Fächer erst noch als \"leer\" markieren muss, und das passiert nicht beim DELETE.\n\nTechnisch gibt es drei Schichten, und jede kann der Grund sein:\n\n1. **DELETE macht Zeilen nur unsichtbar.** Die Zeilen bleiben als dead tuples liegen, bis ein Vacuum läuft. Das Löschen großer Datenmengen senkt die gemeldete Größe deshalb nicht sofort [1].\n2. **Auch nach dem Vacuum wird der Platz in der Regel nur intern wiederverwendet.** Supabase beschreibt das so: Postgres gibt freigewordenen Platz für die interne Wiederverwendung frei, aber nicht an das Betriebssystem zurück [2].\n3. **Die Disk selbst schrumpft nicht von allein.** Cloud-Volumes wie AWS EBS lassen sich nicht an Ort und Stelle verkleinern [2]. Beim Projekt-Upgrade wird die Disk neu dimensioniert, auf das 1,2-Fache der Datenbankgröße bei mindestens 8 GB [3]. Dabei gibt es kurze Downtime [2].\n\nEs gibt auch einen manuellen Weg: `vacuum full <tabelle>` schreibt die Tabelle neu und kann so die gemeldete Größe senken. Die Doku warnt, dass es die Tabelle bis zum Ende sperrt und kurzzeitig mehr Ressourcen braucht [1].\n\n> ⚠ Risk: `VACUUM FULL` nimmt für die Dauer des Laufs eine Sperre auf die Tabelle, Lesen und Schreiben blockieren. Das gehört nicht ungeprüft auf Produktion. Probiere es erst in der lokalen Lab-Datenbank.\n\nBevor wir irgendetwas reparieren, brauchen wir Evidenz, welche der drei Schichten bei dir zutrifft. Dieser Befehl ist read-only:\n\n```sql\nselect\n  relname,\n  n_live_tup,\n  n_dead_tup,\n  last_vacuum,\n  last_autovacuum,\n  pg_size_pretty(pg_total_relation_size(relid)) as total_size\nfrom pg_stat_user_tables\norder by pg_total_relation_size(relid) desc\nlimit 10;\n```\n\nErwartet wird eine Zeile pro Tabelle. Die Zahlen sind Schätzungen aus den Statistik-Zählern, keine exakten Werte. Ein hohes `n_dead_tup` und ein altes oder leeres `last_autovacuum` sprechen für Schicht 1. Ein niedriges `n_dead_tup` bei unveränderter Größe spricht für Schicht 2 oder 3. Das beweist aber noch nicht, dass die Größe nach dem Vacuum wieder sinken müsste, denn genau das ist Schicht 2. Die Quellen: [1] und [2] sind Supabase-Doku, die Query habe ich nicht ausgeführt.\n\n```mermaid\nflowchart LR\n  A[DELETE] --> B[dead tuples<br/>noch auf Disk]\n  B -->|VACUUM| C[Platz frei<br/>für Wiederverwendung]\n  C -->|VACUUM FULL oder Upgrade| D[Datei bzw. Disk<br/>wird kleiner]\n```\n\nMach das und gib mir die Ausgabe, redigiert, falls Tabellennamen sensibel sind. Ich schau derweil, ob noch Pralinen da sind. Vorab die eine Frage: Du löschst 1 Million Zeilen, danach läuft ein normales Autovacuum durch. Erwartest du, dass `pg_database_size()` deutlich sinkt, und warum (oder warum nicht)?",
+  "diagrams": [
+   {
+    "id": "d1",
+    "kind": "flowchart",
+    "title": "Von DELETE bis zur kleineren Disk",
+    "code": "flowchart LR\n  A[DELETE] --> B[dead tuples noch auf Disk]\n  B -->|VACUUM| C[Platz frei fuer Wiederverwendung]\n  C -->|VACUUM FULL oder Upgrade| D[Datei bzw. Disk wird kleiner]"
+   }
+  ],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/platform/database-size.md#vacuum-operations",
+    "title": "Understanding Database and Disk Size: Vacuum operations",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:07.478049+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/troubleshooting/disk-size-not-shrinking-after-deleting-data-135390.md#disk-size-not-shrinking-after-deleting-data",
+    "title": "Disk size not shrinking after deleting data",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:11.826758+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/platform/database-size.md#reducing-disk-size",
+    "title": "Understanding Database and Disk Size: Reducing disk size",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:07.478049+00:00"
+   }
+  ],
+  "next_question": "Du löschst 1 Million Zeilen, danach läuft ein normales Autovacuum durch. Erwartest du, dass pg_database_size() deutlich sinkt, und warum (oder warum nicht)?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "autovacuum-and-bloat, step 1 of 5"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "database size not reduced after deleting rows VACUUM FULL disk space",
+    "products": [
+     "database",
+     "kb",
+     "platform"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "vacuum bloat dead tuples autovacuum return space to operating system",
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 3212,
+  "cache_creation_input_tokens": 7230,
+  "cache_read_input_tokens": 37435
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

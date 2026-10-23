@@ -1,0 +1,88 @@
+{
+ "case_id": "g15",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, RLS begrenzt Zeilen, nicht Spalten. Spalten steuerst du mit Spaltenprivilegien per GRANT. Aber ein bestehendes Tabellenprivileg bleibt wirksam. Du entziehst nur SELECT auf internal_note, das Tabellen-SELECT bleibt. Kann authenticated die Spalte danach noch lesen, und warum?",
+  "text": "Kleinkünstler, du willst nicht den ganzen Kühlschrank sperren, sondern nur die Schnapspralinen-Schublade. RLS entscheidet, welche Zeilen du siehst, aber nicht, welche Spalten. Das ist die Grenze der Analogie: Zeilen sind in der Datenbank keine Fächer, und RLS hat kein Spaltenkonzept. Spalten steuerst du über Privilegien. [1]\n\n**Mechanismus:** Postgres kennt zwei Arten von Privilegien. Tabellenweit gilt ein Privileg für alle Spalten. Spaltenweit gilt es nur für die genannten. Beide können gleichzeitig existieren. Wenn du ein Spaltenprivileg entziehst, das Tabellenprivileg aber noch besteht, gilt das Tabellenprivileg weiter. [2] Das ist die häufigste Falle. Auf bestehenden Projekten haben `anon`, `authenticated` und `service_role` neue Tabellen in `public` oft schon mit allen Privilegien bekommen. Das hängt vom Projekt ab, siehe die Docs zu den Default Privileges. [5] Du musst also zuerst das Tabellenprivileg zurücknehmen und danach gezielt Spalten freigeben.\n\nMinimales Beispiel für eine Wegwerf-Datenbank (Lab). Die Tabelle `public.posts` mit den Spalten `id`, `user_id`, `title`, `content`, `internal_note` ist ein Beispiel.\n\n```sql\n-- Tabellenweites SELECT entziehen\nrevoke select on table public.posts from authenticated;\n\n-- Nur diese Spalten freigeben\ngrant select (id, user_id, title, content) on table public.posts to authenticated;\n\n-- Rollback: Zustand vor dem Experiment wiederherstellen\n-- revoke select (id, user_id, title, content) on table public.posts from authenticated;\n-- grant select on table public.posts to authenticated;\n```\n\n**Was du erwarten musst:** `select id, title from posts` funktioniert. `select internal_note from posts` liefert SQLSTATE 42501. `select *` schlägt ebenfalls fehl, auch über die API. Du musst die Spaltennamen explizit angeben. [3] Die RLS-Policies gelten zusätzlich weiter, sie laufen nur auf den Zeilen, die das Privileg überhaupt zulässt.\n\n**Alternativen, ohne Rabbit Hole:**\n- Die Docs raten für die meisten Fälle von Spaltenprivilegien ab. Sie empfehlen RLS plus eine eigene Tabelle für die sensiblen Daten. [1]\n- Eine View ist keine automatische Lösung. Sie wird meist als `postgres` angelegt und umgeht dann RLS. Sie braucht dieselbe Sorgfalt wie eine Tabelle. [4]\n\nQuellen:\n- [1] https://supabase.com/docs/guides/database/postgres/column-level-security.md#column-level-security\n- [2] https://supabase.com/docs/guides/database/postgres/column-level-security.md#privileges-at-the-column-level\n- [3] https://supabase.com/docs/guides/database/postgres/column-level-security.md#considerations-when-using-column-level-privileges\n- [4] https://supabase.com/docs/guides/auth/row-level-security.md#views-and-rls\n- [5] https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies\n\nAlle Quellen sind offizielle Supabase-Docs, abgerufen am 2026-10-21. Ich habe das Beispiel in dieser Antwort nicht im Lab ausgeführt.\n\nVorhersage, bevor du etwas ausprobierst: `authenticated` hat noch das Standard-Tabellenprivileg `SELECT` auf `public.posts`. Du führst nur `revoke select (internal_note) on table public.posts from authenticated;` aus. Kann `authenticated` danach `internal_note` noch lesen? Begründe es mit dem, was du über Tabellen- und Spaltenprivilegien weißt.",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/column-level-security.md#column-level-security",
+    "title": "Column Level Security",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:42.271964+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/postgres/column-level-security.md#privileges-at-the-column-level",
+    "title": "Privileges at the column level",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:42.271964+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/database/postgres/column-level-security.md#considerations-when-using-column-level-privileges",
+    "title": "Considerations when using column-level privileges",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:42.271964+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#views-and-rls",
+    "title": "Views and RLS",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:21.009992+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/database/postgres/row-level-security.md#grants-and-policies",
+    "title": "Grants and policies",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.066813+00:00"
+   }
+  ],
+  "next_question": "Du führst nur 'revoke select (internal_note) on table public.posts from authenticated;' aus, das Tabellen-SELECT bleibt bestehen. Kann authenticated internal_note danach noch lesen, und warum?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "column privileges vs RLS, step 1"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "column level privileges GRANT SELECT on specific columns",
+    "products": [
+     "database",
+     "security"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "column level security RLS cannot restrict columns views",
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 3009,
+  "cache_creation_input_tokens": 53388,
+  "cache_read_input_tokens": 37428
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

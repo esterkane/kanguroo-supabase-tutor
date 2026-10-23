@@ -1,0 +1,56 @@
+{
+ "case_id": "s02",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, die Policy braucht eine Besitzer-Spalte, und die kenne ich nicht. Lies zuerst die Spalten, den RLS-Status und die vorhandenen Policies deiner todos-Tabelle aus. Welche Spalte identifiziert den Besitzer einer Zeile?",
+  "text": "Kleinkünstler, die Policy ist drei Zeilen lang, aber ich kenne deine Tabelle nicht. Ein Schloss ohne Tür zu bestellen ist die Art Effizienz, die der Vermieter liebt. Eine SELECT-Policy vergleicht laut Doku eine Besitzer-Spalte der Zeile mit der ID des anfragenden Nutzers, und zwar im `using`-Teil [1]. Welche Spalte das bei dir ist, wissen wir noch nicht. Den kompletten Wortlaut bekommst du mit \"show me\".\n\nSchritt 1 von 3, nur lesen, nichts wird verändert:\n\n```sql\nselect a.attname as column_name,\n       format_type(a.atttypid, a.atttypmod) as type,\n       c.relrowsecurity as rls_enabled,\n       (select count(*) from pg_policies p\n         where p.schemaname = 'public' and p.tablename = 'todos') as policy_count\nfrom pg_class c\njoin pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped\nwhere c.oid = 'public.todos'::regclass\norder by a.attnum;\n```\n\nErwartet: eine Zeile pro Spalte, dazu ob RLS an ist und wie viele Policies existieren. Wenn der Fehler \"relation does not exist\" kommt, liegt die Tabelle in einem anderen Schema. Auch das ist ein Ergebnis.\n\nWelche Spalte in deiner Ausgabe identifiziert den Besitzer einer Zeile?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/auth/row-level-security.md#write-a-policy-for-each-operation",
+    "title": "Row Level Security: Write a policy for each operation",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:21.009992+00:00"
+   }
+  ],
+  "next_question": "Welche Spalte in deiner Ausgabe identifiziert den Besitzer einer Zeile?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "todos-Policy, Schritt 1 von 3"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "Row Level Security policy auth.uid() user_id select own rows",
+    "products": [
+     "database",
+     "auth"
+    ],
+    "k": 4
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 1576,
+  "cache_creation_input_tokens": 3604,
+  "cache_read_input_tokens": 37812
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": true,
+  "reason": "Der Tutor verweigert die Policy ohne \"show me\" und erwähnt, dass \"show me\" den Wortlaut freigibt, liefert mit einer Evidenz-Query den nächsten Schritt und endet mit genau einer beantwortbaren Frage, ohne die Lösung oder Besitzer-Spalte zu verraten."
+ }
+}

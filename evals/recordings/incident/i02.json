@@ -1,0 +1,116 @@
+{
+ "case_id": "i02",
+ "turn": {
+  "mode": "incident",
+  "language": "en",
+  "persona_on": true,
+  "speech": "Kleinkünstler, 91 percent CPU is a thermometer, not a diagnosis. 85 of 200 connections says little about how many are actually working. Run the pg_stat_activity snapshot three times and tell me: how many sessions are active with no wait event, and how many are idle?",
+  "text": "Kleinkünstler, \"91% CPU\" is a thermometer reading, not a diagnosis. The landlord also says the building is \"warm\" and blames the plumbing. We need the model first.\n\n## Incident model so far\n\n| Field | Known | Unknown |\n|---|---|---|\n| Symptom | DB CPU 91%, sustained | Is anything user-visible too (latency, errors, timeouts)? |\n| Timeline | Started after API traffic doubled yesterday | Did a deploy, migration or new feature ship at the same time? |\n| Scope | Whole database CPU | Which roles, endpoints and tables? |\n| Environment | Hosted, assumed | Compute size, plan, Postgres version |\n| Connections | 85 of 200 | How many are *active* versus idle? |\n\n**Evidence: 85/200 connections.** This mostly argues against connection exhaustion. It is a count of open sessions, not of sessions doing work. Eighty idle pooled connections cost almost no CPU, and twenty busy ones can saturate a small instance.\n\n## Hypotheses, ranked on current evidence\n\n1. **A few query shapes dominate CPU.** Doubled traffic multiplies per-call cost. Candidates are missing or unsuitable indexes, RLS policy functions evaluated per row, or N+1 patterns. Supabase lists query performance, missing indexes and unsuitable compute as common reasons for high CPU [1].\n2. **Compute is undersized, and the queries are fine.** This is plausible after a 2x traffic jump, but we can only conclude it after ruling out #1. Otherwise we pay for a bigger instance to run the same bad query faster.\n3. **Background work competes for CPU,** such as autovacuum or a long job. Supabase has a troubleshooting article on this combination [1].\n4. **Lock contention or connection pressure.** This ranks lowest. Blocked sessions mostly wait and don't burn CPU, and 85/200 isn't near the limit.\n\n**What would change the ranking:** many sessions waiting on locks would promote #4. A single autovacuum or batch job at the top would promote #3. A flat, even distribution of cheap queries would promote #2.\n\n## Discriminating test\n\nBefore we look at which queries are expensive, we need to know what the sessions are doing right now. This is a read-only snapshot of `pg_stat_activity`, the view Supabase documents for diagnosing slow or stuck sessions [3].\n\n```sql\n-- Read-only. Safe on production. Run it 3 times, about 10 seconds apart.\nselect\n  state,\n  wait_event_type,\n  wait_event,\n  count(*) as sessions\nfrom pg_stat_activity\nwhere datname = current_database()\n  and backend_type = 'client backend'\ngroup by 1, 2, 3\norder by sessions desc;\n```\n\n**How to read it:**\n- Many rows with `state = active` and null `wait_event_type` are consistent with sessions executing rather than waiting. That supports #1 or #2. This is general PostgreSQL behaviour that I did not verify in the docs this turn.\n- Many rows with `wait_event_type = Lock` would point to #4.\n- Many rows with `IO` or `LWLock` would point to storage or contention, which is a different branch.\n- Mostly `idle` or `idle in transaction` would mean the 85 connections aren't the story. `idle in transaction` would be its own finding.\n\n**What this does not prove.** A snapshot shows what is happening at one moment. It doesn't show which query is responsible, and it doesn't show the cumulative cost over the day. For that we'll use `pg_stat_statements` next [2]. Cumulative time is not the same as a slow single query: 5 ms × 100,000 calls outweighs 2 s × 10 calls.\n\nRun the snapshot three times and paste the redacted output. Remove any query text if it contains customer data. I'll wait here. Someone should guard the Schnapspralinen.\n\n**Question:** In your snapshot, how many sessions are `active` with no wait event, and how many are `idle`?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/troubleshooting/high-cpu-usage.md#common-reasons-for-high-cpu-usage",
+    "title": "Common reasons for high CPU usage",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:18.562834+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/database/extensions/pg_stat_statements.md#inspecting-activity",
+    "title": "pg_stat_statements: Inspecting activity",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:56:28.577821+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/database/connection-management.md#diagnosing-stuck-and-blocked-queries",
+    "title": "Connection management: Diagnosing stuck and blocked queries",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:07.811026+00:00"
+   }
+  ],
+  "next_question": "In your snapshot, how many sessions are active with no wait event, and how many are idle?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "incident: CPU 91% after traffic doubled"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": {
+   "symptom": "Database CPU at about 91% since API traffic doubled yesterday",
+   "expected": "CPU headroom proportional to load; no sustained saturation",
+   "scope": "Unknown: whole instance CPU; affected endpoints, roles and tables not yet identified",
+   "timeline": "Began after traffic roughly doubled (about 1 day ago); deploys or migrations at the same time not yet known",
+   "environment": "Assumed hosted Supabase; plan, compute size and Postgres version unknown",
+   "evidence": [
+    "CPU about 91%",
+    "Connections 85 of 200 (open sessions only, active count unknown)",
+    "Traffic about 2x"
+   ],
+   "hypotheses": [
+    {
+     "h": "A few query shapes dominate CPU (missing index, RLS per-row cost, N+1)",
+     "rank": 1,
+     "test": "pg_stat_activity snapshot, then pg_stat_statements ordered by total_exec_time and calls"
+    },
+    {
+     "h": "Compute undersized for the doubled load, queries fine",
+     "rank": 2,
+     "test": "Rule out #1 first; compare per-query cost before and after the traffic change"
+    },
+    {
+     "h": "Background work (autovacuum, batch job) competing for CPU",
+     "rank": 3,
+     "test": "Look for autovacuum or long-running entries in pg_stat_activity"
+    },
+    {
+     "h": "Lock contention or connection pressure",
+     "rank": 4,
+     "test": "Check wait_event_type = Lock counts and idle-in-transaction sessions"
+    }
+   ],
+   "root_cause": null,
+   "mitigation": null,
+   "permanent_fix": null,
+   "prevention": null,
+   "confidence": "Low: only two data points so far"
+  },
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "high CPU usage find slow queries pg_stat_statements",
+    "products": [
+     "database",
+     "platform",
+     "kb"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "supabase inspect db outliers calls long-running-queries",
+    "products": [
+     "cli"
+    ],
+    "k": 5
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 3451,
+  "cache_creation_input_tokens": 7174,
+  "cache_read_input_tokens": 37569
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

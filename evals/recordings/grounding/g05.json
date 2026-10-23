@@ -1,0 +1,68 @@
+{
+ "case_id": "g05",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, mit alter role set statement_timeout setzt du das Limit pro Rolle. Danach für die API NOTIFY pgrst reload config. Prüfen geht über pg_roles.rolconfig, nicht über SHOW. Welchen SQLSTATE erwartest du, wenn pg_sleep länger als der Timeout läuft?",
+  "text": "Kleinkünstler, der Vermieter gibt jedem Mitbewohner eine Duschzeit. Wer länger braucht, bekommt keinen Aufpreis, sondern kaltes Wasser. Die Mietrechtsfantasie hört hier auf, denn bei Postgres ist die Duschzeit pro einzelnem Statement begrenzt, nicht pro Tag.\n\n**Die Antwort**\n\nDas Setting hängt an der Rolle:\n\n```sql\nalter role example_role set statement_timeout = '10min';\n```\n\nDie Doku nennt auch `'10s'` als Schreibweise. [1]\n\nWenn die Rolle über die Client-API (PostgREST) genutzt wird, musst du danach die Konfiguration neu laden: [1]\n\n```sql\nNOTIFY pgrst, 'reload config';\n```\n\nPrüfen kannst du es mit `SHOW statement_timeout` nicht. Bei Rollen-Settings musst du in `pg_roles` nachsehen: [1]\n\n```sql\nselect rolname, rolconfig\nfrom pg_roles\nwhere rolname in ('anon', 'authenticated', 'postgres', 'service_role');\n```\n\nErwartet wird ein Eintrag wie `{statement_timeout=10min}` in `rolconfig` bei der geänderten Rolle. Zurücknehmen kannst du die Änderung mit `alter role example_role reset statement_timeout;`. Das habe ich hier nicht in der Doku geprüft, es ist Standard-PostgreSQL. Ich habe in dieser Antwort auch nichts im Lab ausgeführt.\n\n**Was du wissen musst, bevor du es änderst**\n\n- **Defaults laut Doku:** `anon` hat 3s und `authenticated` 8s. `service_role` hat keinen eigenen Wert und fällt auf die 8s von `authenticator` zurück. `postgres` hat keinen eigenen Wert und wird vom globalen Default auf 2min gedeckelt. [1]\n- **Andere Ebenen:** Global geht es mit `alter database postgres set statement_timeout`. Pro Session geht `set statement_timeout`, aber nur bei direkter Verbindung oder Supavisor im Session-Modus (Port 5432). Über die Client-API, im Dashboard und im Transaction-Modus (Port 6543) funktioniert das nicht. [1]\n- **Quellenkonflikt:** Die Timeout-Doku nennt `NOTIFY pgrst, 'reload config'`. [1] Ein KB-Artikel schreibt, es könne \"a quick reboot\" nötig sein. [2] Beide stammen von Supabase (Tier 1). Ich nehme den Reload als ersten Versuch und einen Neustart nur, wenn die Änderung danach nicht wirkt. Welche Seite aktueller ist, kann ich aus den Abrufdaten nicht ableiten.\n- **Sicherheit:** Ein langer Timeout für `anon` ist eine Einladung, die Datenbank mit teuren Anfragen zu blockieren. Das Limit schützt dich. Eine Query, die ständig reinläuft, ist meist ein Fall für `EXPLAIN` oder einen Index, nicht für mehr Zeit. Das ist meine Einschätzung, keine Doku-Aussage.\n\nQuellen: [1] https://supabase.com/docs/guides/database/postgres/timeouts.md#role-level (abgerufen 2026-10-21), [2] https://supabase.com/docs/guides/troubleshooting/canceling-statement-due-to-statement-timeout-581wFv.md (abgerufen 2026-10-21).\n\nMach das gern im Lab. Ich schau derweil, ob noch Pralinen da sind. Setz `authenticated` auf `'1s'` und lass `select pg_sleep(2)` laufen. Welchen SQLSTATE und welche Fehlermeldung erwartest du?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/postgres/timeouts.md#role-level",
+    "title": "Timeouts > Change Postgres timeout > Role level",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:38Z"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/troubleshooting/canceling-statement-due-to-statement-timeout-581wFv.md",
+    "title": "Canceling statement due to \"statement timeout\"",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:09Z"
+   }
+  ],
+  "next_question": "Setz im Lab statement_timeout für authenticated auf '1s' und führe select pg_sleep(2) aus: Welchen SQLSTATE und welche Fehlermeldung erwartest du?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "statement_timeout per role, step 1"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "alter role set statement_timeout",
+    "products": [
+     "database",
+     "platform",
+     "kb"
+    ],
+    "k": 6
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "PostgREST statement timeout anon authenticated role default timeout",
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2400,
+  "cache_creation_input_tokens": 14167,
+  "cache_read_input_tokens": 37422
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

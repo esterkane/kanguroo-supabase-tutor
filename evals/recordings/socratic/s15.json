@@ -1,0 +1,62 @@
+{
+ "case_id": "s15",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, MVCC ist wie eine Inventarliste, in der nichts radiert, sondern durchgestrichen und neu geschrieben wird. Wer die alte Liste hält, liest ungestört weiter. Der Putzdienst, also VACUUM, räumt später auf. Bleiben ctid und xmin nach dem UPDATE gleich oder ändern sie sich?",
+  "text": "Kleinkünstler, stell dir die Pralinen-Inventarliste an der Kühlschranktür vor. Wer etwas ändert, radiert nicht, sondern schreibt eine neue Zeile und streicht die alte durch. Wer noch mit der alten Liste in der Hand dasteht, liest ungestört weiter. Der Putzdienst entsorgt durchgestrichene Zeilen erst, wenn niemand sie mehr braucht. Wie in jeder guten Behörde wird nichts gelöscht, nur archiviert, bis jemand aufräumt.\n\nTechnisch: MVCC (Multi-Version Concurrency Control) heißt, dass PostgreSQL bei einem `UPDATE` eine neue Zeilenversion (Tuple) anlegt, statt die alte zu überschreiben. Jede Transaktion sieht über einen Snapshot nur die Versionen, die für sie sichtbar sind. Deshalb blockieren Leser keine Schreiber. Die alten Versionen räumt später VACUUM weg, das ist die Stelle, an der die Analogie endet. Dass dieser Aufräumschritt zur Standard-Heap-Speicherung gehört, sieht man indirekt daran, dass Supabase bei OrioleDB damit wirbt, MVCC über ein Undo-Log zu lösen und Vacuum überflüssig zu machen [1]. Die PostgreSQL-Doku selbst habe ich in diesem Durchlauf nicht abgerufen. Das ist also eine Lücke, keine Verschwörung.\n\nMein eigener Lab-Lauf hat keine Zeilen zurückgegeben. Ich behaupte deshalb kein Ergebnis. Führ das in einer einzigen Session aus, zum Beispiel im SQL-Editor, und füge die Ausgabe ein:\n\n```sql\ncreate temp table mvcc_demo(id int primary key, v text);\ninsert into mvcc_demo values (1, 'alt');\nselect ctid, xmin, xmax, v from mvcc_demo;\nupdate mvcc_demo set v = 'neu' where id = 1;\nselect ctid, xmin, xmax, v from mvcc_demo;\n```\n\nDie Tabelle ist temporär und verschwindet am Sessionende. Mach das. Ich schau derweil, ob noch Pralinen da sind. Vorhersage zuerst: Werden `ctid` und `xmin` der Zeile nach dem `UPDATE` gleich bleiben oder sich ändern?",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/orioledb.md#undo-log",
+    "title": "Undo log (OrioleDB Overview)",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:36.662824+00:00"
+   }
+  ],
+  "next_question": "Werden ctid und xmin der Zeile nach dem UPDATE gleich bleiben oder sich ändern?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "MVCC basics, step 1 of 5"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "MVCC multiversion concurrency control readers don't block writers snapshot",
+    "products": [
+     "database"
+    ],
+    "k": 4
+   }
+  },
+  {
+   "name": "run_lab_sql",
+   "input": {
+    "sql": "create temp table mvcc_demo(id int primary key, v text);\ninsert into mvcc_demo values (1, 'alt');\nselect ctid, xmin, xmax, v from mvcc_demo;\nupdate mvcc_demo set v = 'neu' where id = 1;\nselect ctid, xmin, xmax, v from mvcc_demo;",
+    "role": "postgres"
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2345,
+  "cache_creation_input_tokens": 3128,
+  "cache_read_input_tokens": 37789
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": {
+  "pass": true,
+  "reason": "Das Tutor-Reply erklärt das Konzept MVCC (kein Lösungs- oder Root-Cause-Reveal für ein Problem des Lernenden), enthält ein Experiment zur Evidenz und endet mit genau einer beantwortbaren Vorhersagefrage, die der Lernende selbst durchdenken muss."
+ }
+}

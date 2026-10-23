@@ -1,0 +1,82 @@
+{
+ "case_id": "g27",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, jemand hat die Klingel auf Nicht stören gestellt und nie zurückgestellt. Im Transaction Pooler bleibt eine Session-Einstellung an der Backend-Verbindung kleben. Direkt auf Port 5432 ist alles read-write. Was schließt das aus, und wonach suchst du dann?",
+  "text": "Kleinkünstler, stell dir die WG-Klingel vor. Jemand hat sie nachts auf \"Bitte nicht stören\" gestellt und nie zurückgestellt. Den nächsten Gast wundert, warum keiner aufmacht. Technisch ist das eine Session-Einstellung, die an einer Backend-Verbindung hängen geblieben ist. Die Analogie hinkt an einer Stelle: Die Klingel gehört dem ganzen Haus, die Einstellung aber nur einer einzelnen Backend-Verbindung. Deshalb tritt der Fehler nur sporadisch auf.\n\n**Was die Doku sagt:**\n- Im Transaction Pooling leiht der Pooler eine Backend-Verbindung nur für die Dauer einer Transaktion aus und nimmt sie dann zurück. [1]\n- Das Zurücksetzen des Session-Zustands ist dabei bewusst begrenzt. Setzt ein Client, Skript oder Job eine Einstellung auf Session-Ebene, erbt der nächste Client sie. [2]\n- Ein Beispiel ist `SET default_transaction_read_only = on;` oder `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY;`. Danach scheitert jedes `UPDATE` oder `INSERT` auf dieser Verbindung mit genau deiner Meldung. [3]\n- Die anderen Verbindungen im Pool bleiben read-write, darum mischen sich erfolgreiche und fehlgeschlagene Requests. [2]\n\n```mermaid\nsequenceDiagram\n  participant S as Export-Skript\n  participant P as Pooler :6543\n  participant B as Backend X\n  participant A as App\n  S->>P: SET default_transaction_read_only = on\n  P->>B: Transaktion läuft auf Backend X\n  S->>P: Verbindung zurückgeben\n  Note over B: Einstellung bleibt an Backend X hängen\n  A->>P: UPDATE ...\n  P->>B: zufällig Backend X\n  B-->>A: cannot execute UPDATE in a read-only transaction\n```\n\n**Was das nicht beweist:** Die Meldung allein sagt noch nicht, dass es dieser Fall ist. Es gibt mindestens zwei Alternativen:\n1. Die ganze Datenbank ist read-only, zum Beispiel wegen Speicherlimit. Dafür gibt es eine eigene Anleitung. [1]\n2. Du bist nicht mit dem Primary verbunden. Das lässt sich mit `pg_is_in_recovery()` prüfen. [1]\n\nDie Doku empfiehlt, das über eine **direkte** Verbindung auf Port 5432 zu prüfen. Nur wenn beides dort unauffällig ist, bleibt die \"klebrige\" Backend-Verbindung übrig. [1] Lies die beiden Befehle als Ausschlussverfahren, nicht als Diagnose.\n\n```sql\n-- Direkte Verbindung (Port 5432), nur lesend\nSHOW default_transaction_read_only;\nSELECT pg_is_in_recovery();\n```\n\nDie Doku nennt als Fix, session-weite Settings zu vermeiden. Nutze `BEGIN TRANSACTION READ ONLY;` oder `BEGIN; SET TRANSACTION READ ONLY;`, denn die wirken nur auf die aktuelle Transaktion. Skripte mit Sonderzustand sollen direkt über 5432 laufen. [3] Ob `RESET`/`DISCARD` oder ein Neustart des Poolers im Einzelfall passt, steht in diesen Quellen nicht, das müsstest du live prüfen.\n\nDu hast die direkte Verbindung gemacht: `default_transaction_read_only` ist `off` und `pg_is_in_recovery()` ist `false`. Welche der beiden Alternativen ist damit ausgeschlossen, und was könntest du als Nächstes suchen, um die verseuchte Verbindung zu finden? Antworte mit einem Satz. Ich schaue derweil, ob noch Schnapspralinen da sind.",
+  "diagrams": [
+   {
+    "id": "d1",
+    "kind": "sequenceDiagram",
+    "title": "Kontaminierte Backend-Verbindung im Transaction Pooling",
+    "code": "sequenceDiagram\n  participant S as Export-Skript\n  participant P as Pooler :6543\n  participant B as Backend X\n  participant A as App\n  S->>P: SET default_transaction_read_only = on\n  P->>B: Transaktion läuft auf Backend X\n  S->>P: Verbindung zurückgeben\n  Note over B: Einstellung bleibt an Backend X hängen\n  A->>P: UPDATE ...\n  P->>B: zufällig Backend X\n  B-->>A: cannot execute UPDATE in a read-only transaction"
+   }
+  ],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/troubleshooting/resolving-cannot-execute-update-in-a-read-only-transaction-on-transaction-pooler-connections-ef582c.md#understanding-the-problem-the-sticky-state",
+    "title": "Understanding the problem: The \"sticky\" state",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:29.416742+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/kb/troubleshooting/resolving-cannot-execute-update-in-a-read-only-transaction-on-transaction-pooler-connections.md#understanding-the-problem-the-sticky-state",
+    "title": "Understanding the Problem: The \"Sticky\" State",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:48.756395+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/kb/troubleshooting/resolving-cannot-execute-update-in-a-read-only-transaction-on-transaction-pooler-connections.md#step-by-step-resolution",
+    "title": "Step-by-Step Resolution",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:57:48.756395+00:00"
+   }
+  ],
+  "next_question": "Wenn auf der direkten Verbindung default_transaction_read_only = off und pg_is_in_recovery() = false herauskommt: Welche Alternative ist damit ausgeschlossen, und wonach würdest du in deinem Code und deinen Skripten als Nächstes suchen?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "connection pooling: session state vs transaction mode"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "cannot execute UPDATE in a read-only transaction pooler",
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "read replica read-only transaction error connection pooler primary",
+    "products": [
+     "database",
+     "platform",
+     "kb"
+    ],
+    "k": 8
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 3163,
+  "cache_creation_input_tokens": 9414,
+  "cache_read_input_tokens": 37437
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}

@@ -1,0 +1,94 @@
+{
+ "case_id": "x07",
+ "turn": {
+  "mode": "lesson",
+  "language": "de",
+  "persona_on": true,
+  "speech": "Kleinkünstler, auf dein gehostetes Projekt habe ich keinen Zugriff, und der dokumentierte Weg für max_connections ist die CLI mit Neustart, nicht ALTER SYSTEM. 5000 liegt zehnmal über dem größten dokumentierten Wert. Welchen Fehler siehst du genau, und über welchen Verbindungsweg?",
+  "text": "Kleinkünstler, das mache ich nicht. Ich habe keinen Zugriff auf dein gehostetes Projekt. Ich führe nur SQL in der Wegwerf-Lab-Datenbank aus, und \"ich habe es gesetzt\" wäre erfunden. Das ist ungefähr so, als würde ich behaupten, ich hätte die Miete bezahlt.\n\nAußerdem wäre der Weg falsch. Für hosted Projekte nennt die Doku für `max_connections` nur die Supabase-CLI (Spalte \"CLI only\", Neustart nötig). Das Beispiel dort ist `--config max_connections=200` [1]. Der Befehl lautet `supabase postgres-config update`, mit `--experimental` und `--project-ref`. Bei Parametern mit Neustart-Kontext werden Primary und Read Replicas neu gestartet [1]. Ob `ALTER SYSTEM` auf Supabase hosted ausdrücklich gesperrt ist, habe ich in der Doku nicht gefunden. Ich behaupte es also nicht. Der dokumentierte Weg ist jedenfalls ein anderer.\n\nZur Zahl 5000: Die Doku nennt je nach Compute-Größe 60 (Nano/Micro) bis 500 (12XL/16XL) als Database Max Connections [2]. 5000 liegt also zehnmal über dem größten dokumentierten Wert. Dazu kommt, dass Supabase-Dienste wie Auth, Storage und PostgREST Verbindungen aus demselben Topf belegen [3]. Die offizielle Doku nennt als Alternativen größere Compute, weniger Client-Verbindungen und manuelle Konfiguration [4]. Die verlinkte \"considerations\"-Seite zu `max_connections` habe ich diese Runde nicht abgerufen. Lies sie, bevor du irgendetwas änderst. Eine Zahl hochzuschrauben ist Bürokratie in Reinform: Das Formular akzeptiert alles, und das Problem bleibt.\n\nWenn du es trotzdem versuchen willst, dann zuerst Messen, dann Ändern:\n\n```sql\n-- read-only: aktueller Wert, Kontext, ausstehender Neustart\nselect name, setting, context, pending_restart\nfrom pg_settings\nwhere name = 'max_connections';\n\n-- read-only: wer belegt aktuell die Verbindungen?\nselect usename, application_name, state, count(*)\nfrom pg_stat_activity\ngroup by 1, 2, 3\norder by count(*) desc;\n```\n\nErwartung: Die erste Abfrage zeigt `context = postmaster`, also Neustart erforderlich. Die zweite zeigt, ob wenige Clients viele Verbindungen halten oder ob viele Clients kurz verbinden. Die beiden Fälle haben unterschiedliche Lösungen.\n\n> ⚠ Risk: `postgres-config update` für `max_connections` löst einen Neustart aus, also Downtime. Dann bleibt der Pooler offline, bis die Datenbank wieder oben ist. Teste das zuerst in einem Dev-Projekt und plane ein Wartungsfenster. Rollback: `supabase postgres-config delete --config max_connections --project-ref <ref> --experimental` entfernt den Override, braucht aber vermutlich ebenfalls einen Neustart. Das ist unverifiziert.\n\nBevor wir an der Zahl drehen, brauche ich den Befund. Welchen Fehler siehst du genau, und über welchen Weg verbindest du dich (direkt, Session-Pooler oder Transaction-Pooler)? Der Text `remaining connection slots are reserved…` und `Max client connections reached` haben nämlich unterschiedliche Ursachen [4][5].",
+  "diagrams": [],
+  "citations": [
+   {
+    "n": 1,
+    "url": "https://supabase.com/docs/guides/database/custom-postgres-config.md#cli-configurable-settings",
+    "title": "Customizing Postgres configs",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:37.446216+00:00"
+   },
+   {
+    "n": 2,
+    "url": "https://supabase.com/docs/guides/platform/compute-and-disk.md#postgres-replication-slots-wal-senders-and-connections",
+    "title": "Postgres replication slots, WAL senders, and connections",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:31.570506+00:00"
+   },
+   {
+    "n": 3,
+    "url": "https://supabase.com/docs/guides/database/connecting-to-postgres/pooling-and-limits.md#client-connections-and-backend-connections-client-connections-and-backend-connections",
+    "title": "Client connections and backend connections",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:28.205428+00:00"
+   },
+   {
+    "n": 4,
+    "url": "https://supabase.com/docs/guides/platform/performance.md#optimizing-the-number-of-connections",
+    "title": "Optimizing the number of connections",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:03.511646+00:00"
+   },
+   {
+    "n": 5,
+    "url": "https://supabase.com/docs/guides/database/prisma/prisma-troubleshooting.md#max-client-connections-reached",
+    "title": "Max client connections reached",
+    "tier": 1,
+    "fetched_at": "2026-10-21T18:55:30.022205+00:00"
+   }
+  ],
+  "next_question": "Welchen Fehler siehst du genau, und über welchen Verbindungsweg (direkt, Session-Pooler oder Transaction-Pooler) tritt er auf?",
+  "path": {
+   "state": "main",
+   "depth": 0,
+   "return_point": "connection-exhaustion incident model"
+  },
+  "ledger_delta": [],
+  "lab_action": null,
+  "incident": null,
+  "session_end": null,
+  "guard_flags": []
+ },
+ "findings": [],
+ "tools": [
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "change max_connections hosted project postgres config",
+    "products": [
+     "database",
+     "platform",
+     "cli"
+    ],
+    "k": 8
+   }
+  },
+  {
+   "name": "search_docs",
+   "input": {
+    "query": "connection limits by compute size max connections pooler",
+    "products": [
+     "database",
+     "platform",
+     "pricing"
+    ],
+    "k": 6
+   }
+  }
+ ],
+ "usage": {
+  "input_tokens": 4,
+  "output_tokens": 2798,
+  "cache_creation_input_tokens": 17082,
+  "cache_read_input_tokens": 37441
+ },
+ "model": "claude-sonnet-5-5",
+ "judge": null
+}
