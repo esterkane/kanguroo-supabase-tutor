@@ -23,6 +23,7 @@ from backend.tutor.lab_runner import LabRunner, lab_pool
 from backend.tutor.ledger import LedgerStore, PgLedger
 from backend.tutor.orchestrator import Message, Orchestrator, reply_text
 from backend.tutor.prompt import ONBOARDING_LAB, ActiveLab, OnboardingStep, SessionState
+from backend.tutor.refresh import RefreshManager
 from backend.tutor.retrieval import PgHybridRetriever, Retriever, embedder_from_env
 from backend.tutor.schemas import TutorTurn
 
@@ -133,6 +134,7 @@ class TutorService:
     retriever: Retriever
     ledger: LedgerStore
     anthropic: AsyncAnthropic | None
+    refresh: RefreshManager | None = None
     store: TurnStore = field(init=False)
     runners: dict[UUID, LabRunner] = field(default_factory=dict)
     locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
@@ -151,6 +153,7 @@ class TutorService:
             verifier=JwtVerifier(os.environ["API_URL"]),
             retriever=PgHybridRetriever(app_pool, embedder_from_env()), ledger=PgLedger(app_pool),
             anthropic=AsyncAnthropic() if has_llm else None,
+            refresh=RefreshManager(app_pool, db_url, os.environ.get("TUTOR_REFRESH_TOKEN")),
         )
 
     async def open(self) -> None:
@@ -158,6 +161,8 @@ class TutorService:
         await self.lab_pool.open()
 
     async def close(self) -> None:
+        if self.refresh:
+            await self.refresh.close()
         for runner in self.runners.values():
             await runner.close_sessions()
         await self.lab_pool.close()

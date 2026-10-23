@@ -48,8 +48,17 @@ turn: env ## one real tutor turn (uses API tokens): make turn Q="Hallo" [ARGS="-
 	@test -f .env || { echo "create .env with ANTHROPIC_API_KEY (cp .env.example .env)"; exit 1; }
 	$(WITH_ENV) set -a && . ./.env && set +a && $(PY) scripts/tutor_turn.py $(ARGS) "$(Q)"
 
-refresh: ## re-fetch changed docs only
+refresh: ## re-fetch changed docs only (directly, without the backend)
 	$(MAKE) ingest
+
+refresh-schedule: env ## weekly docs refresh: Vault URL+token from .env, pg_cron job (CRON="0 3 * * 1" to change)
+	$(WITH_ENV) set -a && . ./.env && set +a && $(PY) scripts/refresh_schedule.py install $(if $(CRON),--cron "$(CRON)",)
+
+refresh-now: env ## trigger the refresh through pg_cron's path (pg_net -> backend); backend must be running
+	$(WITH_ENV) $(PY) scripts/refresh_schedule.py run-now
+
+refresh-status: env ## scheduled job, last cron runs and refresh runs
+	$(WITH_ENV) $(PY) scripts/refresh_schedule.py status
 
 dev: env ## backend :$(API_PORT) + frontend :$(WEB_PORT) (loads .env.local and .env)
 	($(WITH_ENV) { [ -f .env ] && set -a && . ./.env && set +a; true; } && \
@@ -95,4 +104,4 @@ evals: env ## full eval suite: 69 live tutor turns + judge, records them (uses A
 	$(WITH_ENV) { [ -f .env ] && set -a && . ./.env && set +a; true; } && \
 	  $(PY) scripts/eval.py --all --record --judge --strict
 
-.PHONY: help env seed up down reset olist dev-user ingest search turn refresh dev smoke test-db test-labs lint check evals evals-offline eval-calibrate
+.PHONY: help env seed up down reset olist dev-user ingest search turn refresh refresh-schedule refresh-now refresh-status dev smoke test-db test-labs lint check evals evals-offline eval-calibrate

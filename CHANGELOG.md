@@ -86,3 +86,8 @@
   one step per turn, no compound questions. Eval fixes: transcript history for s06–s09, mid-course eval ledger.
   Judge calibration (`--calibrate`, `--rejudge`, evals/calibration_socratic.jsonl): Haiku/low 44% → Sonnet/medium
   default; remaining disagreement shows the reference path is more generous than the strict Socratic spec.
+- 2026-10-23 T1.12 weekly docs refresh: migration 20261023000000 (pg_net, tutor.refresh_run with RLS and no learner
+  grants, security-definer tutor.trigger_refresh() reading URL + token from Vault) + pgTAP 005; backend
+  `POST/GET /tutor/internal/refresh` (constant-time token check, 202/409, one run at a time, ingest as background
+  subprocess, summary recorded); `scripts/refresh_schedule.py` + `make refresh-schedule|refresh-now|refresh-status`.
+  Verified live: pg_net from the DB container reached the backend via host.docker.internal and ran the ingest.

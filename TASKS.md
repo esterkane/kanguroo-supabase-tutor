@@ -50,7 +50,10 @@ is green and the task's test exists. Skill to load is in brackets.
     2026-10-23, not yet re-run.
   - Include incident→lesson cases from `docs/examples/slow-query-tutoring-path.md` (one question per turn,
     credit-then-correct, "what this does not prove", meaning-preserving fix).
-- [ ] T1.12 `pg_cron` job `refresh_docs` weekly calling the ingest via `pg_net` to FastAPI `/internal/refresh` (local only) [llms-txt-ingest]
+- [x] T1.12 `pg_cron` job `refresh_docs` weekly calling the ingest via `pg_net` to FastAPI `/internal/refresh` (local only) [llms-txt-ingest]
+  - Done: pg_cron job `tutor-refresh-docs` (Mondays 03:00 UTC) -> tutor.trigger_refresh() (URL + token in Vault)
+    -> pg_net -> POST /tutor/internal/refresh -> incremental ingest subprocess; runs in tutor.refresh_run.
+    `make refresh-schedule | refresh-now | refresh-status`. The backend must be running at that time.
 
 ## Hands-on track on real data (Olist e-commerce, started 2026-10-21)
 
@@ -85,7 +88,8 @@ Paths are in the sibling clones under ~/projects. Order = suggested order.
   (recall@k/MRR, labels by URL/heading + phrase, baseline JSON, fail on >0.05 drop). Feeds T1.11; do before R2.
 - [ ] R2 Reranker + per-document cap: `audhs-tutor/backend/app/knowledge/rerank.py` (`FastembedReranker`,
   `cap_per_document`, `candidate_count`) as the `Reranker` in `retrieval.py`, behind `RERANK=1`; measure with R1.
-- [ ] R3 Ingest freshness: send `If-None-Match` (ETag is stored but unused) and reuse embeddings per
+- [ ] R3 Ingest freshness: ~~send `If-None-Match`~~ (checked 2026-10-23: the docs send no ETag/Last-Modified,
+  only `cache-control: max-age=86400`; hash-skip stays) — still open: reuse embeddings per
   (content_hash, embedding_model) so a changed page only re-embeds changed chunks. Makes T1.12 cheap.
 - [ ] R4 Banned phrases / sentence caps from `audhs-tutor/backend/app/evals/hardchecks.py` as guard warnings.
 - [ ] R5 Per-turn cost + cache-hit logging (`tutor.model_call`), idea from `audhs-tutor/.../models_ai/budget.py`;

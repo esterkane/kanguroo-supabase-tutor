@@ -10,6 +10,8 @@ GET  /ledger               mastery ledger, weakest first
 GET  /labs                 available labs
 POST /lab/{slug}/{action}  install | reset | status | hint | check for the session's lab
 POST /lab/sql              the learner's own SQL in the same lab sandbox the tutor uses (lab console)
+POST /internal/refresh     start a docs refresh (pg_cron via pg_net); header X-Refresh-Token; 202 / 409
+GET  /internal/refresh     recent refresh runs (same token)
 """
 from __future__ import annotations
 
@@ -58,6 +60,11 @@ class TurnRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_id: UUID
     text: str = Field(min_length=1, max_length=20000)
+
+
+class RefreshRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    trigger: Literal["cron", "manual", "api"] = "api"
 
 
 class LabSql(BaseModel):
@@ -113,6 +120,30 @@ async def lab_sql(body: LabSql, svc: Svc, user: User) -> dict[str, Any]:
     args = RunLabSqlInput(sql=body.sql, role=body.role, claims=body.claims, explain=body.explain,
                           persist=body.persist, session=body.session)
     return await svc.runner(body.session_id).run_sql(args, user)
+
+
+def _refresh_or_401(svc: TutorService, request: Request) -> Any:
+    refresh = svc.refresh
+    if refresh is None or not refresh.configured:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "docs refresh not configured (TUTOR_REFRESH_TOKEN)")
+    if not refresh.token_ok(request.headers.get("x-refresh-token")):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid refresh token")
+    return refresh
+
+
+@router.post("/internal/refresh", status_code=status.HTTP_202_ACCEPTED)
+async def start_refresh(request: Request, svc: Svc, body: RefreshRequest | None = None) -> Any:
+    refresh = _refresh_or_401(svc, request)
+    run_id, started = await refresh.start((body or RefreshRequest()).trigger)
+    if not started:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"a refresh is already running ({run_id})")
+    return {"run_id": run_id, "started": True}
+
+
+@router.get("/internal/refresh")
+async def refresh_status(request: Request, svc: Svc) -> Any:
+    refresh = _refresh_or_401(svc, request)
+    return {"running": refresh.running, "runs": await refresh.recent()}
 
 
 def _sse(event: str, data: Any) -> dict[str, str]:
