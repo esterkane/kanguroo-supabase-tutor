@@ -18,7 +18,7 @@ import httpx
 BUCKET = "tutor-audio"
 SIGNED_URL_TTL_S = 3600
 MAX_CHARS = 800  # the guard keeps `speech` at <= 60 words; this only bounds abuse
-DEFAULT_VOICES = {"de": "de_DE-thorsten-high", "en": ""}
+DEFAULT_VOICES = {"de": "de_DE-thorsten-high", "en": "en_US-ryan-high"}  # PIPER_VOICE_<LANG>="" opts a language out
 
 
 class TtsUnavailable(Exception):
@@ -60,11 +60,24 @@ class PiperProvider:
         self.url = url.rstrip("/")
         self.voices = voices
         self.client = client
+        self.downloaded: set[str] | None = None  # Piper's /voices, read once
+
+    async def _check_voice(self, voice: str) -> None:
+        """Piper answers an unknown voice with its default one (German text in an English session); refuse instead."""
+        if self.downloaded is None or voice not in self.downloaded:
+            try:
+                res = await self.client.get(f"{self.url}/voices", timeout=10)
+                self.downloaded = set(res.json()) if res.status_code == 200 else set()
+            except (httpx.HTTPError, ValueError) as e:
+                raise TtsUnavailable(f"piper not reachable at {self.url} ({type(e).__name__}); run `make tts`") from e
+        if voice not in self.downloaded:
+            raise TtsUnavailable(f"piper voice {voice} is not downloaded (make tts-voices)")
 
     def voice_for(self, lang: str) -> str | None:
         return self.voices.get(lang) or None
 
     async def synthesize(self, text: str, voice: str, lang: str) -> bytes:
+        await self._check_voice(voice)
         try:
             res = await self.client.post(f"{self.url}/synthesize", json={"text": text, "voice": voice}, timeout=30)
         except httpx.HTTPError as e:

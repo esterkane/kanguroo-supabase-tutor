@@ -46,13 +46,16 @@ def test_cache_key_depends_on_voice_language_and_text() -> None:
 class FakeBackends:
     """Piper (/synthesize) and Storage (/storage/v1/object[/sign]) in one MockTransport."""
 
-    def __init__(self, piper_status: int = 200) -> None:
+    def __init__(self, piper_status: int = 200, downloaded: tuple[str, ...] = ("de_DE-thorsten-high",)) -> None:
+        self.downloaded = downloaded
         self.objects: dict[str, bytes] = {}
         self.synthesized: list[dict[str, Any]] = []
         self.piper_status = piper_status
 
     def __call__(self, req: httpx.Request) -> httpx.Response:
         path = req.url.path
+        if path == "/voices":
+            return httpx.Response(200, json={v: {"language": {"code": v[:5]}} for v in self.downloaded})
         if path == "/synthesize":
             self.synthesized.append(json.loads(req.content))
             return httpx.Response(self.piper_status, content=silent_wav() if self.piper_status == 200 else b"no")
@@ -98,6 +101,27 @@ async def test_failures_raise_tts_unavailable_so_the_browser_falls_back() -> Non
     with pytest.raises(TtsUnavailable, match="nothing to speak"):
         await voice.speech_url("```sql\nselect 1;\n```", "de")
     await voice.close()
+
+
+async def test_a_voice_piper_has_not_downloaded_is_refused_not_replaced() -> None:
+    backends = FakeBackends()
+    voice = service(backends, {"de": "de_DE-thorsten-high", "en": "en_US-ryan-high"})
+    with pytest.raises(TtsUnavailable, match="en_US-ryan-high is not downloaded"):
+        await voice.speech_url("Which role is asking?", "en")
+    await voice.close()
+    assert backends.synthesized == []  # Piper would have read English with the German voice
+
+
+def test_english_has_a_server_voice_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TUTOR_TTS", "server")
+    monkeypatch.setenv("SECRET_KEY", "secret")
+    monkeypatch.setenv("API_URL", "http://supabase:54321")
+    monkeypatch.delenv("PIPER_VOICE_EN", raising=False)
+    voice = VoiceService.from_env()
+    assert voice is not None and voice.voices() == {"de": "de_DE-thorsten-high", "en": "en_US-ryan-high"}
+    monkeypatch.setenv("PIPER_VOICE_EN", "")  # opt English out: browser voice
+    opted = VoiceService.from_env()
+    assert opted is not None and opted.voices()["en"] is None
 
 
 async def test_to_mp3_without_ffmpeg_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:

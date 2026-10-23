@@ -47,8 +47,8 @@ Short form. Revisit when the "Revisit when" condition triggers.
   macOS are robotic unless a Premium voice is installed. Piper 1.8 is GPL-3.0, so it runs as its own process
   (`uvx`, Piper's HTTP server, `make tts`) and the backend talks HTTP to it; it is not a dependency of this
   repo. The endpoint takes a `turn_id`, never free text, so only a stored `speech` track is voiced. MP3 via
-  ffmpeg is cached in the private bucket `tutor-audio` and played via a 1 h signed URL. English stays on the
-  browser voice (or Kokoro, R9).
+  ffmpeg is cached in the private bucket `tutor-audio` and played via a 1 h signed URL. English uses Piper
+  `en_US-ryan-high` (T2.6, same server); Kokoro (R9) stays optional.
 
 ## ADR-006 Structured tutor output
 

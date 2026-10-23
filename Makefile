@@ -65,7 +65,7 @@ dev: env ## backend :$(API_PORT) + frontend :$(WEB_PORT) (loads .env.local and .
 	  uv run uvicorn backend.main:app --reload --port $(API_PORT) &) && cd frontend && \
 	  TUTOR_API_PORT=$(API_PORT) npm run dev -- --port $(WEB_PORT) --strictPort
 
-tts-voices: ## download the Piper voices for server TTS into data/piper (German: Thorsten high, ~110 MB)
+tts-voices: ## download the Piper voices for server TTS into data/piper (Thorsten high + Ryan high, ~235 MB)
 	@{ [ -f .env ] && set -a && . ./.env && set +a; true; } && $(PY) scripts/tts.py download
 
 tts: tts-voices ## run the local Piper TTS server (127.0.0.1:5002); enable with TUTOR_TTS=server in .env

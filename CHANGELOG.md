@@ -113,3 +113,5 @@
 - 2026-10-23 T2.5 spaced review with FSRS (py-fsrs, per ledger topic, due topics in the session state) and the
   session-end block (stored, carried into the next session, five-heading card, guard: three retrieval questions);
   eval set `session` 2/2.
+- 2026-10-23 T2.6 English server voice: Piper en_US-ryan-high alongside Thorsten (default PIPER_VOICE_EN); the
+  provider refuses voices Piper has not downloaded instead of getting German audio for English text.

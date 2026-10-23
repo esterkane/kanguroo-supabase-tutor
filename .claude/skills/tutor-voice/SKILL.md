@@ -30,7 +30,9 @@ persona is on, neutral otherwise; German/English per session.
   bucket is private; the frontend fetches via signed URL (teach signed URLs here).
 - Built (R11): Piper is GPL-3.0 and runs as a separate process (`make tts`, HTTP :5002); never add
   `piper-tts` to pyproject. `POST /tutor/voice/speech` takes a `turn_id` and voices only that turn's
-  stored `speech`. WAV -> MP3 via ffmpeg.
+  stored `speech`. WAV -> MP3 via ffmpeg. Voices: de_DE-thorsten-high, en_US-ryan-high (one Piper server
+  loads both on demand; the provider refuses a voice missing from Piper's /voices instead of letting Piper
+  fall back to its default voice).
 - The browser falls back to Web Speech if the server audio fails.
 
 ## Tests

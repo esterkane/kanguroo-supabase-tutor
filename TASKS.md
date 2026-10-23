@@ -156,7 +156,10 @@ Paths are in the sibling clones under ~/projects. Order = suggested order.
   `session_end` is stored in `session.summary` (+ ended_at); the next session gets still_wrong and the three
   retrieval questions; guard: exactly three questions + a next case. UI: summary card with the five headings,
   due badges in the ledger, "fertig" command. Eval set `session` (2 live cases) 2/2.
-- [ ] T2.6 Optional server TTS (Piper/Kokoro) cached in Storage [tutor-voice]
+- [x] T2.6 Optional server TTS (Piper/Kokoro) cached in Storage [tutor-voice]
+  Done via R11 (German) + `en_US-ryan-high` for English on the same Piper server (default PIPER_VOICE_EN; empty
+  opts English out). The provider checks Piper's /voices first: Piper would otherwise read an unknown voice's
+  text with its default (German) voice. Kokoro (R9) stays optional.
 
 ## Phase 3 — Sub-module and hosted
 
