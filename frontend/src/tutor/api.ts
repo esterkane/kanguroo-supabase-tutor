@@ -51,7 +51,8 @@ export class TutorApi {
   labs() {
     return this.request<{ labs: LabInfo[] }>("/labs");
   }
-  labAction(sessionId: string, slug: string, action: "install" | "reset" | "status" | "hint" | "check") {
+  labAction(sessionId: string, slug: string,
+            action: "install" | "reset" | "status" | "hint" | "check" | "reproduce") {
     return this.request<Record<string, unknown>>(`/lab/${slug}/${action}?session_id=${sessionId}`, { method: "POST" });
   }
   labSql(body: { session_id: string; sql: string; role: string; claims?: Record<string, unknown> | null;

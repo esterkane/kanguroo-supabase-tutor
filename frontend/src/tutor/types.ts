@@ -97,6 +97,7 @@ export interface LabInfo {
   phase: string;
   title: string;
   requires: string[];
+  reproducible?: boolean;
 }
 
 export interface PlanNode {

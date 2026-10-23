@@ -1,0 +1,15 @@
+slug: 02-wrong-jwt-identity
+phase: D
+title: '"My orders shows only one order" — the JWT is right, the identity mapping is not'
+difficulty: medium
+est_minutes: 30
+topics: [jwt-claims-and-sessions, auth-uid-null-semantics, policy-select, postgrest-role-switching]
+requires: [olist]                  # make olist
+persistent_steps: [alter]          # alter policy
+hypotheses:
+  - h: "The JWT carries the wrong user (sub) or no claims at all"
+    discriminating_test: "As authenticated with the customer's sub, select auth.uid() and the profile row: both are the right user; no claims would give NULL and zero rows, not one"
+  - h: "The policy identifies the person by a per-order key"
+    discriminating_test: "count(distinct customer_id) for the customer's customer_unique_id is 17 in lab02.orders; the policy compares with exactly one of them"
+  - h: "Orders are missing in the table / the import lost them"
+    discriminating_test: "As postgres (bypasses RLS) the customer_unique_id has 17 orders; only the RLS view shows 1"

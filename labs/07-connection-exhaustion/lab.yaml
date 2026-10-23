@@ -1,0 +1,27 @@
+slug: 07-connection-exhaustion
+phase: J
+title: '"too many connections for role" — an API that never gives its connections back'
+difficulty: medium
+est_minutes: 35
+topics: [connection-exhaustion, direct-vs-pooler, session-vs-transaction-mode]
+requires: [olist]                  # make olist
+persistent_steps: [alter]          # alter role lab07_app set idle_session_timeout = ...
+session_ttl_s: 900                 # the leaked connections stay for 15 minutes unless you end them
+scenario_sessions:
+  - name: orders-api
+    count: 5
+    login_role: lab07_app
+    application_name: orders-api
+    idle: true                     # request answered, connection never closed
+    sql: "select * from lab07.order_status('10a045cdf6a5650c21e9cfeb60384c16')"
+reproduce:                         # lab_control reproduce: the API's next request, on a new connection
+  login_role: lab07_app
+  application_name: orders-api
+  sql: "select * from lab07.order_status('10a045cdf6a5650c21e9cfeb60384c16')"
+hypotheses:
+  - h: "The database server is out of connections (max_connections)"
+    discriminating_test: "count(*) from pg_stat_activity is far below max_connections; the error names the role: too many connections for role \"lab07_app\""
+  - h: "The role's own connection limit is used up by connections the API never closes"
+    discriminating_test: "pg_roles.rolconnlimit = 5; pg_stat_activity shows 5 sessions of lab07_app, application orders-api, state idle, state_change minutes ago"
+  - h: "Slow queries keep connections busy"
+    discriminating_test: "The sessions are idle, not active; their last query took milliseconds (order_status by primary key)"

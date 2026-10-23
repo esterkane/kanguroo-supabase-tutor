@@ -72,12 +72,12 @@
   },
   {
     "name": "lab_control",
-    "description": "Install, reset, inspect, hint or check a broken lab in the lab database. 'hint' returns only the next unrevealed hint. 'check' runs the lab's pgTAP checks.",
+    "description": "Install, reset, inspect, hint or check a broken lab in the lab database. 'hint' returns only the next unrevealed hint. 'check' runs the lab's pgTAP checks. 'reproduce' opens one new connection the way the lab's customer app does and runs its request (labs that declare it, e.g. connection limits).",
     "input_schema": {
       "type": "object",
       "properties": {
         "slug": { "type": "string" },
-        "action": { "type": "string", "enum": ["install","reset","status","hint","check","list"] }
+        "action": { "type": "string", "enum": ["install","reset","status","hint","check","list","reproduce"] }
       },
       "required": ["action"]
     }

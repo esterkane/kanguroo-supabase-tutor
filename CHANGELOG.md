@@ -104,3 +104,6 @@
   without evidence; Incident tab with source badges, next field, hypothesis status, copy as Markdown.
 - 2026-10-23 T2.2a: a session whose first message reports a customer problem starts in incident mode (detector +
   SSE `mode` event) and skips the first-session onboarding; onboarding also stays off after any incident turn.
+- 2026-10-23 T2.3 labs 02 (wrong JWT identity), 03 (slow RLS policy), 07 (connection exhaustion, real 53300),
+  08 (migration drift) on real Olist data; runner: login-role/idle/count scenario sessions, `lab_control
+  reproduce`, timeouts on lab-owned roles only; runner-driven tests for all four.

@@ -187,7 +187,7 @@ TOOLS: list[dict[str, Any]] = json.loads(r"""
   },
   {
     "name": "lab_control",
-    "description": "Install, reset, inspect, hint or check a broken lab in the lab database. 'hint' returns only the next unrevealed hint. 'check' runs the lab's pgTAP checks.",
+    "description": "Install, reset, inspect, hint or check a broken lab in the lab database. 'hint' returns only the next unrevealed hint. 'check' runs the lab's pgTAP checks. 'reproduce' opens one new connection the way the lab's customer app does and runs its request (labs that declare it, e.g. connection limits).",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -202,7 +202,8 @@ TOOLS: list[dict[str, Any]] = json.loads(r"""
             "status",
             "hint",
             "check",
-            "list"
+            "list",
+            "reproduce"
           ]
         }
       },
@@ -222,7 +223,7 @@ Product = Literal["auth", "database", "realtime", "storage", "functions", "cli",
 WebReason = Literal["pricing", "limits", "versions", "cli_syntax_changed", "current_bug", "community_case",
                     "no_corpus_hit"]
 LabRole = Literal["anon", "authenticated", "postgres"]
-LabAction = Literal["install", "reset", "status", "hint", "check", "list"]
+LabAction = Literal["install", "reset", "status", "hint", "check", "list", "reproduce"]
 
 
 # ----------------------------------------------------------------------------- inputs

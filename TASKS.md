@@ -129,7 +129,16 @@ Paths are in the sibling clones under ~/projects. Order = suggested order.
   to incident mode before the model runs (SSE `mode`); onboarding is skipped in incident mode and for the rest of a
   session that had an incident turn; the opening onboarding step tells the model to switch itself when the
   detector misses. Live: the same 42501 report now opens the Incident tab instead of the baseline case.
-- [ ] T2.3 Labs 02–08: missing grant, wrong JWT identity, slow RLS policy + missing index, lock contention, long transaction vs autovacuum, connection exhaustion (pool sim), migration drift [broken-labs]
+- [x] T2.3 Labs 02–08: missing grant, wrong JWT identity, slow RLS policy + missing index, lock contention, long transaction vs autovacuum, connection exhaustion (pool sim), migration drift [broken-labs]
+  Done 2026-10-23 on real Olist data (04/05/06 earlier, "missing grant" is lab 01):
+  02 wrong JWT identity: policy maps auth.uid() to the per-order customer_id; 2,997 repeat customers lose 3,345
+  orders (the 17-order customer sees 1). 03 slow RLS policy: `auth.uid() = user_id or is_support_agent()` on
+  994,410 rows times out (57014, ~11.6 s); an index changes nothing; `(select ...)` → ~35 ms. 07 connection
+  exhaustion: role CONNECTION LIMIT 5 + five leaked idle `orders-api` sessions → real 53300 via the new
+  `lab_control reproduce`; fix = terminate + `alter role lab07_app set idle_session_timeout` + pooling. 08
+  migration drift: manual hotfix column (date, guessed values) unknown to the history → db_push 42701; repair
+  alone fails the checks. Runner: login-role scenario sessions, `idle`/`count`, `reproduce`, lab-role timeouts.
+  The real Supavisor lab stays O8.
   - Lab 04 (missing-index) should reproduce `docs/examples/slow-query-tutoring-path.md`: orders table,
     `customer_id` filter + `created_at desc limit 20`, then the index-used-but-slow follow-up (dead tuples).
 - [ ] T2.4 Web search adapter with tiering + date + redaction; evals for "label community evidence" [socratic-tutor-loop]

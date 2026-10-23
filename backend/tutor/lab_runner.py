@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import secrets
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -25,7 +26,7 @@ from uuid import UUID
 
 import psycopg
 import yaml
-from psycopg import AsyncConnection
+from psycopg import AsyncConnection, sql
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
@@ -41,7 +42,9 @@ MAX_SESSION_TTL_S = 900  # lock labs keep their blocker open long enough to inve
 
 DENY: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\b(?:create|drop|alter)\s+database\b", re.IGNORECASE), "database DDL is not allowed in the lab"),
-    (re.compile(r"\b(?:create|drop|alter)\s+(?:role|user|group)\b", re.IGNORECASE),
+    # Exception: session timeouts on a role a lab created itself (lab07_app), the documented per-user setting.
+    (re.compile(r"\b(?:create|drop|alter)\s+(?:role|user|group)\b(?!\s+lab\d\d_\w+\s+(?:set|reset)\s+"
+                r"(?:idle_session_timeout|idle_in_transaction_session_timeout|statement_timeout)\b)", re.IGNORECASE),
      "roles are shared with the tutor database; role DDL is not allowed"),
     (re.compile(r"\bgrant\s+(?:anon|authenticated|service_role|postgres|authenticator|supabase\w*|pg_\w+)\s+to\b",
                 re.IGNORECASE), "role membership is cluster-wide; only object privileges can be granted in the lab"),
@@ -72,6 +75,8 @@ NO_TRANSACTION = {"vacuum"}
 # offers inside one statement is fine, e.g. set up as postgres, then query as authenticated.
 LOCAL_ROLE = re.compile(r"\bset\s+local\s+role\s+\"?(\w+)", re.IGNORECASE)
 SWITCHABLE_ROLES = {"anon", "authenticated", "service_role", "postgres"}
+# Roles a lab's setup.sql creates for itself; the runner gives them a fresh random password at install.
+LAB_LOGIN_ROLE = re.compile(r"^lab\d\d_\w+$")
 
 
 def deny_reason(sql: str) -> str | None:
@@ -104,6 +109,11 @@ def single_statement(sql: str) -> bool:
     return ";" not in sql.strip().rstrip(";")
 
 
+def _sqlstate_from(message: str) -> str | None:
+    """libpq reports startup refusals as text only; map the ones the labs teach."""
+    return "53300" if "too many connections" in message else None
+
+
 def parse_tap(lines: list[str]) -> dict[str, Any]:
     tap = [ln for ln in lines if re.match(r"^(?:not )?ok \d+", ln)]
     plan = next((ln for ln in lines if re.match(r"^1\.\.\d+$", ln)), None)
@@ -123,9 +133,23 @@ class LabSpec:
     statement_timeout_ms: int = STATEMENT_TIMEOUT_MS
     hypotheses: tuple[dict[str, str], ...] = ()
     requires: tuple[str, ...] = ()  # dataset schemas in the lab DB, e.g. olist
-    # Sessions the lab opens at install and leaves inside an open transaction (e.g. a stuck job).
-    scenario_sessions: tuple[dict[str, str], ...] = ()
+    # Sessions the lab opens at install: by default left inside an open transaction (a stuck job);
+    # `idle: true` commits so they sit idle (a leaked connection), `count` opens several, `login_role` logs in
+    # as a role the lab created (counts against that role's CONNECTION LIMIT).
+    scenario_sessions: tuple[dict[str, Any], ...] = ()
     session_ttl_s: int = SESSION_TTL_S
+    # lab_control "reproduce": one fresh connection the way the customer's app makes it, then closed.
+    reproduce: dict[str, Any] | None = None
+
+    @property
+    def login_roles(self) -> set[str]:
+        roles = {s["login_role"] for s in self.scenario_sessions if s.get("login_role")}
+        if self.reproduce and self.reproduce.get("login_role"):
+            roles.add(self.reproduce["login_role"])
+        bad = [r for r in roles if not LAB_LOGIN_ROLE.match(r)]
+        if bad:
+            raise ValueError(f"lab {self.slug}: login roles must be lab-owned (labNN_name): {bad}")
+        return roles
 
     @property
     def schema(self) -> str:
@@ -149,6 +173,7 @@ def load_labs(root: Path = LABS) -> dict[str, LabSpec]:
             requires=tuple(spec.get("requires", [])),
             scenario_sessions=tuple(spec.get("scenario_sessions", [])),
             session_ttl_s=min(int(spec.get("session_ttl_s", SESSION_TTL_S)), MAX_SESSION_TTL_S),
+            reproduce=spec.get("reproduce"),
         )
     return labs
 
@@ -198,6 +223,7 @@ class LabRunner:
         self.default_timeout_ms = statement_timeout_ms
         self.active: ActiveLab | None = None
         self.sessions: dict[str, NamedSession] = {}
+        self.role_passwords: dict[str, str] = {}  # in memory only; reset at every install
 
     # ------------------------------------------------------------------ run_lab_sql
     def _timeout_ms(self) -> int:
@@ -335,8 +361,16 @@ class LabRunner:
     def _session_ttl_s(self) -> int:
         return self.active.spec.session_ttl_s if self.active else SESSION_TTL_S
 
-    async def _open_session(self, name: str, application_name: str | None = None) -> NamedSession:
-        conn = await AsyncConnection.connect(self.lab_url, autocommit=False)
+    async def _connect_as(self, login_role: str | None, application_name: str | None = None,
+                          ) -> AsyncConnection:
+        kwargs: dict[str, Any] = {"application_name": application_name} if application_name else {}
+        if login_role:
+            kwargs |= {"user": login_role, "password": self.role_passwords[login_role]}
+        return await AsyncConnection.connect(self.lab_url, autocommit=False, **kwargs)
+
+    async def _open_session(self, name: str, application_name: str | None = None,
+                            login_role: str | None = None) -> NamedSession:
+        conn = await self._connect_as(login_role, application_name)
         await conn.execute(f"set statement_timeout = {self._timeout_ms()}")
         await conn.execute(f"set lock_timeout = {self._lock_timeout_ms()}")
         if application_name:
@@ -397,7 +431,7 @@ class LabRunner:
     async def control(self, args: LabControlInput, user_id: UUID) -> dict[str, Any]:
         handlers: dict[str, Callable[[LabSpec, UUID], Awaitable[dict[str, Any]]]] = {
             "install": self._install, "reset": self._install, "status": self._status,
-            "hint": self._hint, "check": self._check,
+            "hint": self._hint, "check": self._check, "reproduce": self._reproduce,
         }
         if args.action == "list":
             return {"labs": [{"slug": s.slug, "phase": s.phase, "title": s.title} for s in self.labs.values()],
@@ -420,10 +454,19 @@ class LabRunner:
                             "learner_action": f"run `make {dataset}` in the project folder, then install the lab again"}
             await conn.execute(f"drop schema if exists {spec.schema} cascade".encode())
             await conn.execute(setup.encode())
+            for role in spec.login_roles:  # created NOLOGIN by setup.sql; a new random password per install
+                self.role_passwords[role] = secrets.token_urlsafe(24)
+                await conn.execute(sql.SQL("alter role {} login password {}").format(
+                    sql.Identifier(role), sql.Literal(self.role_passwords[role])))
         self.active = ActiveLab(spec, lab_run_id=await self._start_run(spec, user_id))
         for scenario in spec.scenario_sessions:  # e.g. a job that holds locks and stays idle in transaction
-            session = await self._open_session(scenario["name"], scenario.get("application_name"))
-            await session.conn.execute(scenario["sql"].encode())
+            count = int(scenario.get("count", 1))
+            for i in range(count):
+                name = f"{scenario['name']}-{i + 1}" if count > 1 else scenario["name"]
+                session = await self._open_session(name, scenario.get("application_name"), scenario.get("login_role"))
+                await session.conn.execute(scenario["sql"].encode())
+                if scenario.get("idle"):
+                    await session.conn.commit()
         return {"ok": True, "installed": spec.slug, "title": spec.title,
                 "scenario": (spec.path / "README.md").read_text(encoding="utf-8")}
 
@@ -449,6 +492,34 @@ class LabRunner:
         await self._update_run("hints_used = %s", (self.active.hints_used,), user_id)
         return {"ok": True, "hint_number": self.active.hints_used, "hint": hints[self.active.hints_used - 1],
                 "remaining": len(hints) - self.active.hints_used}
+
+    async def _reproduce(self, spec: LabSpec, user_id: UUID) -> dict[str, Any]:
+        """Open one new connection exactly as the lab's app does, run its request, close it: real errors only."""
+        if not spec.reproduce:
+            return {"ok": False, "error": f"lab {spec.slug} has no reproduce step"}
+        rep = spec.reproduce
+        out: dict[str, Any] = {"ok": True, "reproduced_as": rep.get("login_role") or "postgres",
+                               "application_name": rep.get("application_name"), "request": rep["sql"]}
+        started = time.monotonic()
+        try:
+            conn = await self._connect_as(rep.get("login_role"), rep.get("application_name"))
+        except psycopg.OperationalError as e:  # refused at connection start, e.g. 53300
+            message = str(e).strip().splitlines()[-1]
+            out.update(ok=False, stage="connect", sqlstate=e.sqlstate or _sqlstate_from(message), message=message)
+        else:
+            try:
+                async with conn:
+                    cur = conn.cursor(row_factory=dict_row)
+                    await cur.execute(f"set statement_timeout = {self._timeout_ms()}")
+                    await cur.execute(rep["sql"].encode())
+                    rows = await cur.fetchall() if cur.description else []
+                    out.update(stage="query", rows=rows[:MAX_ROWS], row_count=len(rows))
+                    out["session_settings"] = {k: (await (await conn.execute(f"show {k}")).fetchone() or [""])[0]
+                                               for k in ("idle_session_timeout", "statement_timeout")}
+            except psycopg.Error as e:
+                out.update(ok=False, stage="query", sqlstate=e.sqlstate, message=e.diag.message_primary)
+        out["ms"] = round((time.monotonic() - started) * 1000, 1)
+        return out
 
     async def _check(self, spec: LabSpec, user_id: UUID) -> dict[str, Any]:
         checks = (spec.path / "checks.sql").read_text(encoding="utf-8")

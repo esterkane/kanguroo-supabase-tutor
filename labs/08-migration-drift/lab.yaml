@@ -1,0 +1,15 @@
+slug: 08-migration-drift
+phase: G
+title: '"db push fails: column already exists" — a manual hotfix the migration history does not know'
+difficulty: medium
+est_minutes: 35
+topics: [migration-drift-repair, migrations-workflow]
+requires: [olist]                  # make olist
+persistent_steps: [alter, insert, update, delete, select]   # schema reconcile, repair, db_push()
+hypotheses:
+  - h: "The migration file 20261005120000 is broken"
+    discriminating_test: "The statement is valid SQL; 42701 says the column already exists: the target state differs from what the history claims"
+  - h: "The remote schema was changed outside migrations (drift)"
+    discriminating_test: "migration_list() shows 20261005120000 local only; information_schema.columns shows delivery_eta as date (the migration says timestamptz) with values that differ from order_estimated_delivery_date"
+  - h: "Marking the migration as applied is enough"
+    discriminating_test: "After inserting the history row, delivery_eta is still date and holds purchase + 21 days for nearly every order; repair changes only the history table"

@@ -136,13 +136,14 @@ async def get_ledger(svc: Svc, user: User) -> dict[str, Any]:
 
 @router.get("/labs")
 async def list_labs(svc: Svc, user: User) -> dict[str, Any]:
-    return {"labs": [{"slug": s.slug, "phase": s.phase, "title": s.title, "requires": list(s.requires)}
+    return {"labs": [{"slug": s.slug, "phase": s.phase, "title": s.title, "requires": list(s.requires),
+                      "reproducible": s.reproduce is not None}
                      for s in svc.runner(UUID(int=0)).labs.values()]}
 
 
 @router.post("/lab/{slug}/{action}")
-async def lab_action(slug: str, action: Literal["install", "reset", "status", "hint", "check"], session_id: UUID,
-                     svc: Svc, user: User) -> dict[str, Any]:
+async def lab_action(slug: str, action: Literal["install", "reset", "status", "hint", "check", "reproduce"],
+                     session_id: UUID, svc: Svc, user: User) -> dict[str, Any]:
     await _session_or_404(svc, user, session_id)
     return await svc.runner(session_id).control(LabControlInput(slug=slug, action=action), user)
 

@@ -71,6 +71,14 @@ insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setu
 on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
 
 insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
+  ('02-wrong-jwt-identity', 'D', '"My orders shows only one order" — the JWT is right, the identity mapping is not', 'medium', 30, array['jwt-claims-and-sessions', 'auth-uid-null-semantics', 'policy-select', 'postgrest-role-switching']::text[], 'labs/02-wrong-jwt-identity/setup.sql')
+on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
+
+insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
+  ('03-slow-rls-policy', 'H', '"My orders times out since support access launched" — a policy that runs functions per row', 'medium', 40, array['rls-policy-performance', 'explain-analyze-reading', 'index-types-selectivity']::text[], 'labs/03-slow-rls-policy/setup.sql')
+on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
+
+insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
   ('04-missing-index', 'H', '"Order history got slow" — filter + ORDER BY + LIMIT without a matching index', 'medium', 35, array['explain-analyze-reading', 'index-types-selectivity', 'estimates-vs-actuals']::text[], 'labs/04-missing-index/setup.sql')
 on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
 
@@ -80,6 +88,14 @@ on conflict (slug) do update set phase = excluded.phase, title = excluded.title,
 
 insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
   ('06-dead-tuples', 'I', '"Same rows, bigger table, slower queries" — autovacuum off, dead tuples piling up', 'medium', 35, array['autovacuum-and-bloat', 'mvcc-snapshots', 'explain-analyze-reading']::text[], 'labs/06-dead-tuples/setup.sql')
+on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
+
+insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
+  ('07-connection-exhaustion', 'J', '"too many connections for role" — an API that never gives its connections back', 'medium', 35, array['connection-exhaustion', 'direct-vs-pooler', 'session-vs-transaction-mode']::text[], 'labs/07-connection-exhaustion/setup.sql')
+on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
+
+insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values
+  ('08-migration-drift', 'G', '"db push fails: column already exists" — a manual hotfix the migration history does not know', 'medium', 35, array['migration-drift-repair', 'migrations-workflow']::text[], 'labs/08-migration-drift/setup.sql')
 on conflict (slug) do update set phase = excluded.phase, title = excluded.title, difficulty = excluded.difficulty, est_minutes = excluded.est_minutes, topics = excluded.topics, setup_path = excluded.setup_path;
 
 insert into tutor.lab (slug, phase, title, difficulty, est_minutes, topics, setup_path) values

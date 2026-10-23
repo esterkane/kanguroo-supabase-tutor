@@ -1,0 +1,15 @@
+slug: 03-slow-rls-policy
+phase: H
+title: '"My orders times out since support access launched" — a policy that runs functions per row'
+difficulty: medium
+est_minutes: 40
+topics: [rls-policy-performance, explain-analyze-reading, index-types-selectivity]
+requires: [olist]                  # make olist
+persistent_steps: [alter, create]  # alter policy; create index is allowed but is not the fix
+hypotheses:
+  - h: "An index on user_id is missing"
+    discriminating_test: "Create the index: the plan still shows Seq Scan on lab03.orders with the same Filter and the query still times out; the OR with a function prevents an index scan"
+  - h: "The policy functions run once per row"
+    discriminating_test: "EXPLAIN shows Filter: ((auth.uid() = user_id) OR lab03.is_support_agent()) on ~1M rows; the same query as postgres (RLS bypassed) takes milliseconds; wrapped in (select ...) the functions become InitPlans that run once"
+  - h: "Too much data / the sort is the problem"
+    discriminating_test: "As postgres the identical ORDER BY ... LIMIT 20 over all rows finishes fast; the extra cost only exists under the authenticated role"

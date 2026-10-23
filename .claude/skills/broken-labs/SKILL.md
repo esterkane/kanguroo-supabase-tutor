@@ -40,6 +40,17 @@ Register in `supabase/seed.sql` (`insert into tutor.lab ...`) via `scripts/lab.p
 - Concurrency labs (locks/deadlocks/long transactions) need two sessions: the runner
   supports named sessions (`session='a'|'b'`) kept open for ≤ 120 s, then force-rolled back.
 - Every run is logged into `tutor.lab_run.tests[]` with the role, SQL hash, SQLSTATE, ms.
+- `scenario_sessions` (lab.yaml) open real sessions at install: default left in an open transaction (a stuck
+  job, lab 05); `idle: true` commits so they sit idle (a leaked connection, lab 07); `count: N` opens N;
+  `login_role: labNN_x` logs in as a role the lab's setup.sql created NOLOGIN; the runner sets LOGIN and a
+  random in-memory password at every install. Only `labNN_*` roles are accepted.
+- `reproduce:` (lab.yaml) + `lab_control reproduce`: one fresh connection as the declared role and
+  application_name, runs the app's request, closes; returns the real refusal (e.g. 53300) or rows and the
+  session settings it got.
+- The only role DDL the runner lets through: `alter role labNN_x set|reset idle_session_timeout |
+  idle_in_transaction_session_timeout | statement_timeout` (the per-user setting PostgreSQL documents).
+- Roles are cluster-wide and the lab DB shares the server with the tutor and Supabase: never exhaust
+  `max_connections`; use a role CONNECTION LIMIT instead (lab 07).
 
 ## Starter catalogue (Phase 2 T2.3)
 | nn | slug | phase | mechanism |
