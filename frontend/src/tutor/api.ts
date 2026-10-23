@@ -1,6 +1,6 @@
 // Typed client for the FastAPI router (backend/tutor/router.py), mounted at apiBase.
 import { SseParser } from "./sse";
-import type { LabInfo, LabSqlResult, LedgerEntry, Session, StreamEvent, TranscriptRow } from "./types";
+import type { LabInfo, LabSqlResult, LedgerEntry, Session, StreamEvent, TranscriptRow, VoiceInfo } from "./types";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -33,6 +33,14 @@ export class TutorApi {
   ledger() {
     return this.request<{ entries: LedgerEntry[] }>("/ledger");
   }
+  voiceInfo() {
+    return this.request<VoiceInfo>("/voice");
+  }
+  /** Signed URL to the cached server audio of a tutor turn's `speech` track (503: use the browser voice). */
+  voiceSpeech(turnId: string) {
+    return this.request<{ url: string; voice: string; cached: boolean }>("/voice/speech",
+      { method: "POST", body: JSON.stringify({ turn_id: turnId }) });
+  }
   labs() {
     return this.request<{ labs: LabInfo[] }>("/labs");
   }
@@ -45,14 +53,15 @@ export class TutorApi {
   }
 
   /** Stream one tutor turn; calls onEvent for every SSE event in order. */
-  async turn(sessionId: string, text: string, onEvent: (e: StreamEvent) => void, signal?: AbortSignal) {
+  async turn(sessionId: string, text: string, onEvent: (e: StreamEvent) => void,
+             inputMode: "text" | "voice" = "text", signal?: AbortSignal) {
     const token = await this.token();
     const res = await fetch(`${this.apiBase}/turn`, {
       method: "POST",
       signal,
       headers: { "Content-Type": "application/json", Accept: "text/event-stream",
                  ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ session_id: sessionId, text }),
+      body: JSON.stringify({ session_id: sessionId, text, input_mode: inputMode }),
     });
     if (!res.ok || !res.body) {
       const body = await res.json().catch(() => ({}));

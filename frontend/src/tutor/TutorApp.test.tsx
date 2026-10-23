@@ -58,3 +58,42 @@ test("signed in: creates a session, streams a turn and renders it with sources",
   expect(screen.getByText(/GRANT zuerst/)).toBeTruthy();
   expect(calls).toContain("POST /tutor/turn");
 });
+
+test("voice: a spoken answer is sent as input_mode voice and only the speech track is read aloud", async () => {
+  let rec: { onresult: ((e: unknown) => void) | null } | null = null;
+  vi.stubGlobal("webkitSpeechRecognition", class {
+    lang = ""; continuous = false; interimResults = false; onresult = null; onend = null; onerror = null;
+    constructor() { rec = this; }
+    start() {} stop() {} abort() {}
+  });
+  const spoken: string[] = [];
+  vi.stubGlobal("speechSynthesis", { speak: (u: { text: string }) => spoken.push(u.text), cancel() {},
+                                     getVoices: () => [], addEventListener() {}, removeEventListener() {} });
+  vi.stubGlobal("SpeechSynthesisUtterance", class { constructor(public text: string) {} });
+  const bodies: unknown[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url === "/tutor/session") return json({ id: "s1", objective: null, mode: "lesson", language: "de",
+                                                persona_on: true, started_at: "now" }, 201);
+    if (url === "/tutor/ledger") return json({ entries: [] });
+    if (url === "/tutor/turn") {
+      bodies.push(JSON.parse(String(init?.body)));
+      return sse(["turn", { turn_id: "t1", model: "m", usage: {}, turn: {
+        mode: "lesson", language: "de", persona_on: true, speech: "Welche Rolle fragt hier an?", diagrams: [],
+        ledger_delta: [], guard_flags: [], citations: [], text: "```sql\nselect 1;\n```\n\nWelche Rolle fragt hier an?" } }]);
+    }
+    return json({ detail: "unexpected" }, 500);
+  }));
+  try {
+    localStorage.clear();
+    render(<TutorApp supabase={fakeSupabase(true)} apiBase="/tutor" />);
+    const mic = await screen.findByRole("button", { name: "Sprechen" });
+    fireEvent.pointerDown(mic);
+    rec!.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: "Die anon Rolle" } }] });
+    fireEvent.pointerUp(mic);
+    await waitFor(() => expect(spoken).toEqual(["Welche Rolle fragt hier an?"]));
+    expect(bodies).toEqual([{ session_id: "s1", text: "Die anon Rolle", input_mode: "voice" }]);
+    expect(screen.getByRole("button", { name: "Nochmal anhören" })).toBeTruthy();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

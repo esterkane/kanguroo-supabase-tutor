@@ -2,7 +2,7 @@ import type { Session as AuthSession, SupabaseClient } from "@supabase/supabase-
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ApiError, TutorApi } from "./api";
 import { LoginForm } from "./auth/LoginForm";
-import { ChatPanel } from "./chat/ChatPanel";
+import { ChatPanel, type InputMode } from "./chat/ChatPanel";
 import { chatReducer, initialChat } from "./chatReducer";
 import { t } from "./i18n";
 import { consolePreset, LabConsole } from "./lab/LabConsole";
@@ -10,6 +10,7 @@ import { type LabOutput, LabsPanel } from "./sidebar/LabsPanel";
 import { Ledger } from "./sidebar/Ledger";
 import { LessonSidebar } from "./sidebar/LessonSidebar";
 import type { LedgerEntry, Session, TutorTurn } from "./types";
+import type { ServerTts } from "./voice/useSpeech";
 
 export interface TutorAppProps {
   /** Supabase client of the host app (standalone: created in main.tsx). */
@@ -46,6 +47,7 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
   const [tab, setTab] = useState<Tab>("lesson");
   const [fatal, setFatal] = useState<string | null>(null);
   const [handover, setHandover] = useState<LabOutput | null>(null);
+  const [serverTts, setServerTts] = useState<ServerTts | null>(null);
   const authRef = useRef<AuthSession | null>(null);
 
   useEffect(() => {
@@ -88,9 +90,12 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
       : Promise.reject(new ApiError(404, "no session"))
     ).catch((e) => (e instanceof ApiError && e.status === 404 ? startSession() : setFatal(String(e))));
     api.ledger().then((r) => setLedger(r.entries)).catch(() => undefined);
+    api.voiceInfo().then((info) => setServerTts(info.tts === "server" ? {
+      voices: info.voices, speechUrl: (turnId) => api.voiceSpeech(turnId).then((r) => r.url),
+    } : null)).catch(() => setServerTts(null));  // browser voices only
   }, [api, userId, startSession]);
 
-  const send = useCallback(async (text: string) => {
+  const send = useCallback(async (text: string, inputMode: InputMode = "text") => {
     if (!session) return;
     dispatch({ type: "send", id: crypto.randomUUID(), text });
     try {
@@ -100,7 +105,7 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
           setHandover({ slug: event.data.slug, action: event.data.action, body: event.data.result });
           setTab("lab");
         }
-      });
+      }, inputMode);
       api.ledger().then((r) => setLedger(r.entries)).catch(() => undefined);
     } catch (e) {
       dispatch({ type: "fail", message: e instanceof ApiError && e.status === 503 ? s.noKey : String(e) });
@@ -128,7 +133,7 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
       {session && (
         <>
           <main className="flex min-h-0 flex-col border-r border-zinc-800">
-            <ChatPanel chat={chat} s={s} onSend={send} />
+            <ChatPanel chat={chat} s={s} language={session.language} onSend={send} serverTts={serverTts} />
           </main>
           <aside className="flex min-h-0 flex-col">
             <nav className="flex border-b border-zinc-800 text-xs" role="tablist">

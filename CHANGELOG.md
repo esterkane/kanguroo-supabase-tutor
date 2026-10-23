@@ -91,3 +91,10 @@
   `POST/GET /tutor/internal/refresh` (constant-time token check, 202/409, one run at a time, ingest as background
   subprocess, summary recorded); `scripts/refresh_schedule.py` + `make refresh-schedule|refresh-now|refresh-status`.
   Verified live: pg_net from the DB container reached the backend via host.docker.internal and ran the ingest.
+- 2026-10-23 T2.1 voice: Web Speech push-to-talk (hold button or Space) and hands-free (1.2 s silence), interim
+  transcript, denied-mic notice; TTS reads only `TutorTurn.speech` (cleaned of code/URLs) at rate 0.95 / pitch 0.85,
+  barge-in cancels, mute (remembered), per-turn replay, speaking indicator; voice picker ranks Premium/Enhanced/Google
+  voices first and never auto-picks macOS novelty voices; `input_mode: voice` stored on the learner's turn.
+- 2026-10-23 R11 server TTS: German Piper voice (Thorsten high) as a separate GPL process (`make tts`), MP3 cached
+  in the private Storage bucket `tutor-audio` and played via 1 h signed URL; `POST /tutor/voice/speech {turn_id}`
+  voices only stored `speech`; picker defaults to it, Web Speech fallback on any failure; pgTAP 006, tests.

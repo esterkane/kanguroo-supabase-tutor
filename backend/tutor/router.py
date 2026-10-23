@@ -12,6 +12,8 @@ POST /lab/{slug}/{action}  install | reset | status | hint | check for the sessi
 POST /lab/sql              the learner's own SQL in the same lab sandbox the tutor uses (lab console)
 POST /internal/refresh     start a docs refresh (pg_cron via pg_net); header X-Refresh-Token; 202 / 409
 GET  /internal/refresh     recent refresh runs (same token)
+GET  /voice                server TTS availability and voices per language
+POST /voice/speech         signed URL to the cached server audio of one tutor turn's `speech` track
 """
 from __future__ import annotations
 
@@ -29,6 +31,7 @@ from sse_starlette import EventSourceResponse
 from backend.tutor.orchestrator import Final, Rewrite, Token, ToolCall, ToolResultSummary
 from backend.tutor.service import TutorService
 from backend.tutor.tools import LabControlInput, LabRole, RunLabSqlInput, ToolContext
+from backend.tutor.voice import TtsUnavailable
 
 router = APIRouter(tags=["tutor"])
 
@@ -60,6 +63,12 @@ class TurnRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_id: UUID
     text: str = Field(min_length=1, max_length=20000)
+    input_mode: Literal["text", "voice"] = "text"  # voice: final Web Speech transcript (T2.1)
+
+
+class SpeechRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    turn_id: UUID  # by turn, not free text: only a turn's `speech` track is ever voiced
 
 
 class RefreshRequest(BaseModel):
@@ -181,7 +190,8 @@ async def turn(body: TurnRequest, svc: Svc, user: User) -> EventSourceResponse:
                     elif isinstance(event, Final):
                         # Persist only complete turns, so the stored history stays replayable.
                         turn_id = await svc.store.append(user, body.session_id, event.new_messages, event.turn,
-                                                         event.usage, previous_mode=session["mode"])
+                                                         event.usage, previous_mode=session["mode"],
+                                                         input_mode=body.input_mode)
                         yield _sse("turn", {"turn_id": turn_id, "turn": event.turn.model_dump(mode="json"),
                                             "usage": event.usage, "model": event.model,
                                             "findings": [f.model_dump() for f in event.findings]})
@@ -202,3 +212,23 @@ async def turn(body: TurnRequest, svc: Svc, user: User) -> EventSourceResponse:
                 yield _sse("error", {"status": 502, "message": "could not reach the Anthropic API"})
 
     return EventSourceResponse(events())
+
+
+@router.get("/voice")
+async def voice_info(svc: Svc, user: User) -> dict[str, Any]:
+    if svc.voice is None:
+        return {"tts": "browser", "voices": {}}
+    return {"tts": "server", "voices": svc.voice.voices()}
+
+
+@router.post("/voice/speech")
+async def voice_speech(body: SpeechRequest, svc: Svc, user: User) -> dict[str, Any]:
+    if svc.voice is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "server TTS is off (TUTOR_TTS=browser)")
+    found = await svc.store.speech(user, body.turn_id)
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "turn not found")
+    try:
+        return await svc.voice.speech_url(*found)
+    except TtsUnavailable as e:  # the browser falls back to Web Speech
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e)) from e

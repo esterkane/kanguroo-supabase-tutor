@@ -3,7 +3,7 @@ import type { TutorTurn } from "../types";
 import { Markdown } from "./Markdown";
 import { MermaidBlock } from "./MermaidBlock";
 
-export function TurnView({ turn, s }: { turn: TutorTurn; s: Strings }) {
+export function TurnView({ turn, s, onReplay }: { turn: TutorTurn; s: Strings; onReplay?: (speech: string) => void }) {
   return (
     <article className="space-y-2">
       <Markdown text={turn.text} diagramFailed={s.diagramFailed} />
@@ -27,6 +27,12 @@ export function TurnView({ turn, s }: { turn: TutorTurn; s: Strings }) {
             ))}
           </ol>
         </footer>
+      )}
+      {onReplay && turn.speech && (
+        <button type="button" onClick={() => onReplay(turn.speech)} title={turn.speech}
+                className="rounded border border-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-400 hover:border-sky-600">
+          {s.replay}
+        </button>
       )}
       {turn.guard_flags.length > 0 && (
         <p className="text-[11px] text-zinc-500">guard: {turn.guard_flags.join(", ")}</p>

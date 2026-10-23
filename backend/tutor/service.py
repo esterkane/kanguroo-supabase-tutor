@@ -26,6 +26,7 @@ from backend.tutor.prompt import ONBOARDING_LAB, ActiveLab, OnboardingStep, Sess
 from backend.tutor.refresh import RefreshManager
 from backend.tutor.retrieval import PgHybridRetriever, Retriever, embedder_from_env
 from backend.tutor.schemas import TutorTurn
+from backend.tutor.voice import VoiceService
 
 APP_MESSAGE = "[app message, not from the learner]"
 
@@ -96,9 +97,19 @@ class TurnStore:
             return "opening"
         return "lab_handover" if has_flow_diagram else "request_flow"
 
+    async def speech(self, user_id: UUID, turn_id: UUID) -> tuple[str, str] | None:
+        """(speech, language) of one of the learner's own tutor turns; RLS hides everyone else's."""
+        async with as_user(self.pool, user_id) as conn:
+            cur = await conn.execute("select tutor_turn->>'speech', tutor_turn->>'language' from tutor.turn "
+                                     "where id = %s and role = 'assistant' and tutor_turn is not null", (turn_id,))
+            row = await cur.fetchone()
+        return (row[0] or "", row[1] or "de") if row else None
+
     async def append(self, user_id: UUID, session_id: UUID, messages: list[Message], turn: TutorTurn,
-                     usage: dict[str, int], previous_mode: str) -> UUID:
-        """Persist one turn's messages verbatim; the TutorTurn goes on the last assistant message."""
+                     usage: dict[str, int], previous_mode: str, input_mode: str = "text") -> UUID:
+        """Persist one turn's messages verbatim; the TutorTurn goes on the last assistant message.
+
+        input_mode marks how the learner's message (the first one) was entered; tool results stay 'text'."""
         last_assistant = max(i for i, m in enumerate(messages) if m["role"] == "assistant")
         turn_id: UUID | None = None
         async with as_user(self.pool, user_id) as conn:
@@ -107,10 +118,11 @@ class TurnStore:
                 final = i == last_assistant
                 cur = await conn.execute(
                     "insert into tutor.turn (session_id, role, content, message, tutor_turn, input_tokens,"
-                    " output_tokens) values (%s, %s, %s, %s::jsonb, %s::jsonb, %s, %s) returning id",
+                    " output_tokens, input_mode) values (%s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s) returning id",
                     (session_id, role, turn.text if final else content, json.dumps(message),
                      turn.model_dump_json() if final else None,
-                     usage.get("input_tokens") if final else None, usage.get("output_tokens") if final else None))
+                     usage.get("input_tokens") if final else None, usage.get("output_tokens") if final else None,
+                     input_mode if i == 0 and role == "user" else "text"))
                 row = await cur.fetchone()
                 if final and row:
                     turn_id = row[0]
@@ -135,6 +147,7 @@ class TutorService:
     ledger: LedgerStore
     anthropic: AsyncAnthropic | None
     refresh: RefreshManager | None = None
+    voice: VoiceService | None = None  # server TTS (TUTOR_TTS=server); None: browser voices only
     store: TurnStore = field(init=False)
     runners: dict[UUID, LabRunner] = field(default_factory=dict)
     locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
@@ -154,6 +167,7 @@ class TutorService:
             retriever=PgHybridRetriever(app_pool, embedder_from_env()), ledger=PgLedger(app_pool),
             anthropic=AsyncAnthropic() if has_llm else None,
             refresh=RefreshManager(app_pool, db_url, os.environ.get("TUTOR_REFRESH_TOKEN")),
+            voice=VoiceService.from_env(),
         )
 
     async def open(self) -> None:
@@ -163,6 +177,8 @@ class TutorService:
     async def close(self) -> None:
         if self.refresh:
             await self.refresh.close()
+        if self.voice:
+            await self.voice.close()
         for runner in self.runners.values():
             await runner.close_sessions()
         await self.lab_pool.close()

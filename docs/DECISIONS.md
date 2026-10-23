@@ -43,6 +43,12 @@ Short form. Revisit when the "Revisit when" condition triggers.
 - **Decision:** STT/TTS in the browser; `speech` field separate from `text`.
 - **Why:** zero cost, zero keys, works offline. A server voice (Piper/Kokoro) is an
   additive Phase 2 feature behind `TUTOR_TTS=browser|server`.
+- **Addendum 2026-10-23 (R11):** German server voice = Piper `de_DE-thorsten-high`. Browser German voices on
+  macOS are robotic unless a Premium voice is installed. Piper 1.8 is GPL-3.0, so it runs as its own process
+  (`uvx`, Piper's HTTP server, `make tts`) and the backend talks HTTP to it; it is not a dependency of this
+  repo. The endpoint takes a `turn_id`, never free text, so only a stored `speech` track is voiced. MP3 via
+  ffmpeg is cached in the private bucket `tutor-audio` and played via a 1 h signed URL. English stays on the
+  browser voice (or Kokoro, R9).
 
 ## ADR-006 Structured tutor output
 

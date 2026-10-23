@@ -28,9 +28,12 @@ persona is on, neutral otherwise; German/English per session.
   flag because they cost money.
 - Cache: Supabase Storage bucket `tutor-audio`, object key `sha256(voice|lang|text).mp3`;
   bucket is private; the frontend fetches via signed URL (teach signed URLs here).
+- Built (R11): Piper is GPL-3.0 and runs as a separate process (`make tts`, HTTP :5002); never add
+  `piper-tts` to pyproject. `POST /tutor/voice/speech` takes a `turn_id` and voices only that turn's
+  stored `speech`. WAV -> MP3 via ffmpeg.
 - The browser falls back to Web Speech if the server audio fails.
 
 ## Tests
 - Unit: `speech` guard (length, no code/URL).
-- Manual script `scripts/voice_demo.py` that synthesises three sample lines and writes them
-  to `data/voice/` for listening (Phase 2).
+- Manual demo: `make tts-demo` (`scripts/tts.py demo`) synthesises three sample lines into
+  `data/voice/` for listening.

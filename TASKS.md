@@ -99,6 +99,11 @@ Paths are in the sibling clones under ~/projects. Order = suggested order.
 - [ ] R8 T2.5 spaced review with FSRS (py-fsrs) as in `audhs-tutor/backend/app/kernel/memory.py` instead of SM-2.
 - [ ] R9 T2.6 server TTS via the running Kokoro container (`audhs-tutor/backend/app/voice/tts.py`, sentence
   streaming in `voice/loop.py`) — English only: Kokoro v1 has no German voices, German stays on Web Speech/Piper.
+- [x] R11 German server TTS via Piper (e.g. de_DE thorsten-high), same /tutor/voice endpoint as R9, cached by speech
+  hash; Web Speech stays the fallback. Reason: browser German voices sound robotic unless a Premium voice is installed.
+  Done: `backend/tutor/voice.py`, GET /voice + POST /voice/speech {turn_id}, bucket `tutor-audio` (migration +
+  pgTAP 006), `scripts/tts.py` (`make tts|tts-voices|tts-demo`), picker option "Thorsten (Piper, lokal)".
+  Measured: first synthesis 0.5–1.9 s, cached replay starts in ~50 ms; fallback to Web Speech verified with Piper off.
 - [ ] R10 ADR-004 cheap local pre-steps (summarise pasted logs, "did the learner answer?") via a small
   Claude/Ollama switch like `compass/llm.py`, not the full audhs gateway.
 - Not planned: moving the corpus to Qdrant/Elasticsearch (ADR-001; a `QdrantRetriever` only for the AuDHS host
@@ -106,7 +111,11 @@ Paths are in the sibling clones under ~/projects. Order = suggested order.
 
 ## Phase 2 — Voice, incident mode, labs
 
-- [ ] T2.1 Web Speech STT/TTS; push-to-talk and hands-free; `speech` track playback [tutor-voice]
+- [x] T2.1 Web Speech STT/TTS; push-to-talk and hands-free; `speech` track playback [tutor-voice]
+  Done: `voice/useSpeech.ts` + `VoiceBar`; input_mode stored per learner turn; quality-ranked voice picker.
+  Browser voices on this Mac are poor (only compact Anna + Eloquence voices in German): install a Premium/Enhanced
+  German voice in macOS Spoken Content, or use Piper (R11, done). Live STT not verified (the Claude Browser pane
+  blocks the microphone); test in Chrome.
 - [ ] T2.2 Incident mode: structured incident model form that the model fills progressively [socratic-tutor-loop]
 - [ ] T2.3 Labs 02–08: missing grant, wrong JWT identity, slow RLS policy + missing index, lock contention, long transaction vs autovacuum, connection exhaustion (pool sim), migration drift [broken-labs]
   - Lab 04 (missing-index) should reproduce `docs/examples/slow-query-tutoring-path.md`: orders table,

@@ -1,13 +1,39 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChatState } from "../chatReducer";
 import type { Strings } from "../i18n";
+import type { Language } from "../types";
+import { type ServerTts, useSpeech } from "../voice/useSpeech";
+import { VoiceBar } from "../voice/VoiceBar";
 import { Markdown } from "./Markdown";
 import { TurnView } from "./TurnView";
 
-export function ChatPanel({ chat, s, onSend }: { chat: ChatState; s: Strings; onSend: (text: string) => void }) {
+export type InputMode = "text" | "voice";
+
+export function ChatPanel({ chat, s, language, onSend, serverTts = null }: {
+  chat: ChatState; s: Strings; language: Language; onSend: (text: string, inputMode: InputMode) => void;
+  serverTts?: ServerTts | null;
+}) {
   const [draft, setDraft] = useState("");
   const end = useRef<HTMLDivElement>(null);
   const busy = chat.streaming !== null;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+
+  const voice = useSpeech(language, (transcript) => {
+    // While the tutor is still answering, a spoken reply lands in the draft instead of being lost.
+    if (busyRef.current) setDraft((d) => (d ? `${d} ${transcript}` : transcript));
+    else onSend(transcript, "voice");
+  }, serverTts);
+  const { speak } = voice;
+
+  const wasStreaming = useRef(false);
+  useEffect(() => {  // speak only the `speech` track of a turn that just finished streaming (not on resume)
+    if (wasStreaming.current && !chat.streaming) {
+      const last = chat.items.at(-1);
+      if (last?.kind === "tutor" && last.turn.speech) void speak(last.turn.speech, last.id);
+    }
+    wasStreaming.current = chat.streaming !== null;
+  }, [chat.streaming, chat.items, speak]);
 
   useEffect(() => {
     // Braces matter: newer Chromium returns a Promise from scrollIntoView, and an effect must not return one.
@@ -17,7 +43,8 @@ export function ChatPanel({ chat, s, onSend }: { chat: ChatState; s: Strings; on
   const submit = () => {
     const text = draft.trim();
     if (!text || busy) return;
-    onSend(text);
+    voice.cancelSpeech();
+    onSend(text, "text");
     setDraft("");
   };
 
@@ -32,7 +59,10 @@ export function ChatPanel({ chat, s, onSend }: { chat: ChatState; s: Strings; on
               {item.text}
             </div>
           ) : (
-            <div key={item.id} className="max-w-[95%]"><TurnView turn={item.turn} s={s} /></div>
+            <div key={item.id} className="max-w-[95%]">
+              <TurnView turn={item.turn} s={s}
+                        onReplay={voice.support.tts && !voice.muted ? (speech) => void speak(speech, item.id) : undefined} />
+            </div>
           ),
         )}
         {chat.streaming && (
@@ -63,6 +93,7 @@ export function ChatPanel({ chat, s, onSend }: { chat: ChatState; s: Strings; on
         {chat.error && <p role="alert" className="text-sm text-red-400">{s.error}: {chat.error}</p>}
         <div ref={end} />
       </div>
+      <VoiceBar voice={voice} s={s} />
       <form className="flex gap-2 border-t border-zinc-800 p-2"
             onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <textarea

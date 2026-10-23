@@ -115,6 +115,11 @@ export interface LabSqlResult {
   ms?: number;
 }
 
+export interface VoiceInfo {
+  tts: "browser" | "server";
+  voices: Partial<Record<Language, string | null>>;
+}
+
 export type StreamEvent =
   | { event: "token"; data: { text: string } }
   | { event: "tool_call"; data: { name: string; input: Record<string, unknown> } }

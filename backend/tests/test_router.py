@@ -124,7 +124,12 @@ async def test_session_turns_are_persisted_and_replayed_verbatim(api: Any, users
     assert [m["role"] for m in stored] == ["user", "system", "assistant"]
     assert "follow the FIRST TURN section" in stored[1]["content"]  # first turn of a new learner
 
-    await client.post("/tutor/turn", json={"session_id": sid, "text": "Weiter"}, headers=auth(a))
+    await client.post("/tutor/turn", json={"session_id": sid, "text": "Weiter", "input_mode": "voice"},
+                      headers=auth(a))
+    async with svc.store.pool.connection() as conn:
+        cur = await conn.execute("select content, input_mode from tutor.turn where session_id = %s and role = 'user' "
+                                 "order by seq", (sid,))
+        assert await cur.fetchall() == [("Hallo", "text"), ("Weiter", "voice")]
     second_request = fake.requests[1]["messages"]
     assert second_request[:3] == stored  # replayed byte-identical from the database
     assert "FIRST TURN" not in second_request[4]["content"]
@@ -231,3 +236,40 @@ async def test_tool_installed_lab_reaches_the_ui_without_coaching(api: Any, user
     assert "coaching_for_tutor_only" not in labs[0]["result"]
     runs = svc.runners[UUID(sid)].active
     assert runs is not None and runs.spec.slug == "01-rls-vs-grant"
+
+
+class FakeVoice:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def voices(self) -> dict[str, str | None]:
+        return {"de": "de_DE-thorsten-high", "en": None}
+
+    async def speech_url(self, text: str, lang: str) -> dict[str, Any]:
+        self.calls.append((text, lang))
+        return {"url": "http://127.0.0.1:54321/storage/v1/object/sign/tutor-audio/x.mp3?token=t",
+                "voice": "de_DE-thorsten-high", "cached": False}
+
+    async def close(self) -> None:
+        pass
+
+
+async def test_voice_speaks_only_the_learners_own_turns_speech(api: Any, users: tuple[UUID, UUID]) -> None:
+    client, svc, fake = api
+    a, b = users
+    assert (await client.get("/tutor/voice", headers=auth(a))).json() == {"tts": "browser", "voices": {}}
+    sid = (await client.post("/tutor/session", json={}, headers=auth(a))).json()["id"]
+    fake.script += [text_reply("Gut, dann schauen wir auf die Evidenz.")]
+    turn_id = parse_sse((await client.post("/tutor/turn", json={"session_id": sid, "text": "Hallo"},
+                                           headers=auth(a))).text)[-1][1]["turn_id"]
+    off = await client.post("/tutor/voice/speech", json={"turn_id": turn_id}, headers=auth(a))
+    assert off.status_code == 503
+
+    svc.voice = FakeVoice()
+    assert (await client.get("/tutor/voice", headers=auth(a))).json()["voices"]["de"] == "de_DE-thorsten-high"
+    res = await client.post("/tutor/voice/speech", json={"turn_id": turn_id}, headers=auth(a))
+    assert res.status_code == 200 and "/object/sign/tutor-audio/" in res.json()["url"]
+    stored = await svc.store.speech(a, UUID(turn_id))
+    assert stored is not None and svc.voice.calls == [stored]
+    assert (await client.post("/tutor/voice/speech", json={"turn_id": turn_id}, headers=auth(b))).status_code == 404
+    assert (await client.post("/tutor/voice/speech", json={"text": "beliebig"}, headers=auth(a))).status_code == 422
