@@ -163,6 +163,21 @@ def test_incident_speech_and_execution_rules() -> None:
     assert "CLAIMED_EXECUTION" not in codes(claim, g.GuardContext(sources=CTX.sources, ran_lab_sql=True))
 
 
+def test_incident_root_cause_rules() -> None:
+    inc = {"symptom": "API down", "evidence": [], "hypotheses": []}
+    restart = turn(mode="incident", incident=inc | {"root_cause": "Projekt wurde neu gestartet", "evidence": ["x"]})
+    assert codes(restart)["INCIDENT_RESTART_ROOT_CAUSE"] == "block"
+    guessed = turn(mode="incident", incident=inc | {"root_cause": "missing index", "confidence": "low"})
+    assert codes(guessed)["INCIDENT_ROOT_CAUSE_WITHOUT_EVIDENCE"] == "block"
+    known = g.GuardContext(sources=CTX.sources, known_evidence=2)  # evidence from earlier turns counts
+    assert "INCIDENT_ROOT_CAUSE_WITHOUT_EVIDENCE" not in codes(guessed, known)
+    assert codes(turn(mode="incident", incident=inc | {"root_cause": "missing index"}), known)[
+        "INCIDENT_CONFIDENCE_MISSING"] == "warn"
+    ranks = turn(mode="incident", incident=inc | {"hypotheses": [{"h": "a", "rank": 1}, {"h": "b", "rank": 1}]})
+    assert codes(ranks)["INCIDENT_HYPOTHESIS_RANKS"] == "warn"
+    assert not [c for c in codes(turn(mode="incident", incident=inc)) if c.startswith("INCIDENT")]
+
+
 def test_repair_message_lists_only_blocking_findings() -> None:
     msg = g.repair_message(g.check(turn(next_question=None, citations=[]), CTX))
     assert msg.startswith("[app message, not from the learner]")

@@ -4,50 +4,57 @@
   "mode": "incident",
   "language": "de",
   "persona_on": true,
-  "speech": "Kleinkünstler, langsam ist ein Symptom, keine Ursache. Der Vermieter sagt auch zu allem Rohre. Ich brauche den Scope: Sind nur Anfragen langsam, die die Datenbank berühren, oder auch Auth, Storage und Edge Functions?",
-  "text": "Kleinkünstler, \"langsam\" ist ein Symptom und keine Ursache. Der Vermieter sagt auch zu jedem Problem \"die Rohre\". Ich rate deshalb nicht, sondern baue zuerst das Incident-Modell. Bisher ist fast alles leer.\n\n**Incident-Modell (Stand jetzt)**\n\n| Feld | Stand |\n|---|---|\n| SYMPTOM | \"langsam\", ohne Messwert, ohne Fehlercode |\n| ERWARTET | unbekannt (welche Latenz war vorher normal?) |\n| SCOPE | unbekannt |\n| ZEITLINIE | \"seit gestern\". Die Uhrzeit und die Änderung davor fehlen noch. |\n| UMGEBUNG | unbekannt (hosted oder lokal, Plan, Postgres-Version, SDK) |\n| EVIDENZ | keine |\n\n**Vorläufige Hypothesen** (nur nach Häufigkeit sortiert, noch ohne Evidenz):\n\n1. Eine einzelne Query oder ein Query-Muster ist langsam geworden. Mögliche Gründe sind Datenwachstum, ein fehlender oder unbenutzter Index, ein schlechter Plan oder eine teure RLS-Policy.\n2. Das Problem liegt in den Ressourcen: CPU, Speicher, IO oder Verbindungen sind erschöpft.\n3. Sperren oder lange Transaktionen blockieren andere Sessions.\n4. Das Problem liegt nicht in der Datenbank, sondern in Netzwerk, Region, Client, Edge Function oder Cold Start.\n5. Seit gestern wurde etwas deployt oder migriert.\n\nDiese Liste ist eine Landkarte und keine Diagnose. Eine Hypothese ändert ihren Rang erst, wenn ein Test sie stützt oder widerlegt.\n\n**Der trennschärfste fehlende Punkt ist der Scope nach Schicht.** Wenn nur Anfragen langsam sind, die die Datenbank berühren, fallen Hypothese 4 und weite Teile von 5 zurück. Sind Auth, Storage und Edge Functions ebenfalls langsam, sieht es eher nach Ressourcen oder Netzwerk aus. Dann ist die einzelne Query unwahrscheinlicher.\n\nIch habe keinen Zugriff auf dein Projekt und sehe keine Logs. Alles, was ich später über deine Umgebung sage, muss aus deinen eingefügten Ausgaben stammen.\n\nWelche Anfragen sind langsam: nur solche, die die Datenbank abfragen (z. B. Data API und RPC), oder auch Auth-Login, Storage-Uploads und Edge Functions, die keine Tabelle anfassen? Antworte bitte mit dem, was du tatsächlich beobachtet hast, und schreib \"nicht geprüft\", falls du es nicht weißt.",
+  "speech": "Kleinkünstler, langsam ist ein Symptom, keine Ursache. Der Vermieter sagt auch zu allem die Rohre. Wir brauchen den Umfang. Betrifft die Verlangsamung nur Datenbankabfragen, oder sind auch Auth, Storage und Edge Functions langsamer?",
+  "text": "Kleinkünstler, \"langsam\" ist ein Symptom, keine Ursache. Der Vermieter sagt auch zu jedem Problem \"die Rohre\". Wir brauchen Umfang und Belege, bevor jemand etwas hochskaliert oder neu startet.\n\n**Was wir bisher haben**\n\n- Symptom: \"langsam\", nicht quantifiziert. Wir wissen nicht, ob es Latenz, Timeouts oder Durchsatz betrifft.\n- Zeitpunkt: seit gestern (2026-10-22). Wir wissen nicht, was sich davor geändert hat.\n- Alles andere fehlt: gehostet oder lokal, betroffene Requests, Fehlercodes, Metriken.\n\n**Erste Hypothesen nach Schicht** (noch keine Evidenz, daher nur eine grobe Ordnung)\n\n| Rang | Hypothese | Kleinster Test |\n|---|---|---|\n| 1 | Einzelne langsame oder neu häufige Queries (Datenwachstum, fehlender Index, RLS-Policy) | `pg_stat_statements` nach Gesamtzeit sortieren, Zeitpunkt des letzten Resets beachten |\n| 2 | Ressourcendruck (CPU, Speicher, Disk-I/O) | Metriken der Datenbank im Zeitverlauf ansehen |\n| 3 | Verbindungsdruck oder Pooling | Anzahl aktiver und wartender Sessions, Fehlermeldungen zu Verbindungen |\n| 4 | Lock-Contention oder lange Transaktionen | `pg_stat_activity` mit Wait Events, Blocker suchen |\n| 5 | Client-, Netzwerk- oder Region-Effekt außerhalb der Datenbank | Dieselbe Anfrage von einem anderen Standort oder Client vergleichen |\n\nDiese Reihenfolge ist nur ein Startpunkt. Sie ändert sich mit der ersten Antwort. Wenn z. B. nur ein Endpunkt betroffen ist, rückt Hypothese 1 nach oben. Sind Auth, Storage und Edge Functions auch betroffen, rücken 2, 3 und 5 nach oben.\n\nDeshalb zuerst eine Frage zum Umfang. Beantworte sie nur mit dem, was du beobachtet hast, nicht mit Vermutungen.\n\n**Ist die Verlangsamung auf Datenbankabfragen (z. B. Data API/PostgREST oder direktes SQL) beschränkt, oder zeigen auch Auth, Storage oder Edge Functions höhere Latenz?**",
   "diagrams": [],
   "citations": [],
-  "next_question": "Welche Anfragen sind langsam: nur datenbankabhängige (Data API, RPC) oder auch Auth-Login, Storage-Uploads und Edge Functions ohne Tabellenzugriff? Schreib 'nicht geprüft', falls du es nicht weißt.",
+  "next_question": "Ist die Verlangsamung auf Datenbankabfragen beschränkt, oder zeigen auch Auth, Storage oder Edge Functions höhere Latenz?",
   "path": {
    "state": "main",
    "depth": 0,
-   "return_point": "incident scoping: layer"
+   "return_point": "incident: Umfang bestimmen"
   },
   "ledger_delta": [],
   "lab_action": null,
   "incident": {
-   "symptom": "Supabase wird als 'langsam' beschrieben, ohne Messwert oder Fehlercode",
+   "symptom": "Supabase wird als langsam gemeldet; nicht quantifiziert (Latenz, Timeouts oder Durchsatz offen).",
    "expected": null,
    "scope": null,
-   "timeline": "seit gestern (Uhrzeit und vorangegangene Änderung unbekannt)",
+   "timeline": "Beginn laut Meldung gestern (2026-10-22); vorherige Änderungen unbekannt.",
    "environment": null,
-   "evidence": [],
+   "evidence": [
+    "Meldung: \"Supabase ist seit gestern langsam.\" Keine Messwerte, keine Fehlercodes."
+   ],
    "hypotheses": [
     {
-     "h": "Einzelne Query oder Query-Muster langsam (Datenwachstum, Index, Plan, RLS)",
+     "h": "Einzelne langsame oder neu häufige Queries (Datenwachstum, fehlender Index, RLS-Policy)",
      "rank": 1,
-     "test": "Scope nach Schicht klären, dann pg_stat_statements und EXPLAIN"
+     "test": "pg_stat_statements nach Gesamtzeit sortieren; Zeitpunkt des letzten Resets prüfen",
+     "status": "open"
     },
     {
-     "h": "Ressourcenerschöpfung (CPU, Speicher, IO, Verbindungen)",
+     "h": "Ressourcendruck (CPU, Speicher, Disk-I/O)",
      "rank": 2,
-     "test": "Metriken und Verbindungsanzahl prüfen"
+     "test": "Datenbank-Metriken im Zeitverlauf seit gestern ansehen",
+     "status": "open"
     },
     {
-     "h": "Sperren oder lange Transaktionen",
+     "h": "Verbindungsdruck oder Pooling-Probleme",
      "rank": 3,
-     "test": "pg_stat_activity auf wartende Sessions prüfen"
+     "test": "Aktive und wartende Sessions zählen; Verbindungsfehler in Logs suchen",
+     "status": "open"
     },
     {
-     "h": "Nicht-DB-Ursache (Netzwerk, Region, Client, Edge Function, Cold Start)",
+     "h": "Lock-Contention oder lange Transaktionen",
      "rank": 4,
-     "test": "Auth, Storage und Edge Functions ohne DB-Zugriff vergleichen"
+     "test": "pg_stat_activity mit Wait Events prüfen und Blocker identifizieren",
+     "status": "open"
     },
     {
-     "h": "Deployment oder Migration seit gestern",
+     "h": "Effekt außerhalb der Datenbank (Client, Netzwerk, Region)",
      "rank": 5,
-     "test": "Änderungen im Zeitfenster vor Symptombeginn abfragen"
+     "test": "Dieselbe Anfrage von anderem Client oder Standort vergleichen",
+     "status": "open"
     }
    ],
    "root_cause": null,
@@ -57,15 +64,19 @@
    "confidence": null
   },
   "session_end": null,
-  "guard_flags": []
+  "guard_flags": [
+   "QUESTION_NOT_IN_TEXT"
+  ]
  },
- "findings": [],
+ "findings": [
+  "QUESTION_NOT_IN_TEXT"
+ ],
  "tools": [],
  "usage": {
   "input_tokens": 2,
-  "output_tokens": 2253,
-  "cache_creation_input_tokens": 529,
-  "cache_read_input_tokens": 18507
+  "output_tokens": 2271,
+  "cache_creation_input_tokens": 1159,
+  "cache_read_input_tokens": 18609
  },
  "model": "claude-sonnet-5-5",
  "judge": null

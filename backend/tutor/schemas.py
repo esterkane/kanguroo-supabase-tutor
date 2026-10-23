@@ -70,7 +70,8 @@ class LabAction(_Strict):
 class Hypothesis(_Strict):
     h: str
     rank: int = Field(ge=1)
-    test: str | None = None
+    test: str | None = None  # the discriminating test that would confirm or falsify it
+    status: Literal["open", "supported", "falsified"] = "open"
 
 
 class Incident(_Strict):

@@ -38,6 +38,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from backend.tutor.guard import sentences, split_markdown
+from backend.tutor.incident import PLACEHOLDER, SCALAR_FIELDS
 from backend.tutor.schemas import TutorTurn
 
 EVALS = ROOT / "evals"
@@ -314,6 +315,10 @@ def score(name: str, case: dict[str, Any], rec: Recording) -> list[str]:
             problems.append(f"mode is {turn.mode}, not incident")
         if turn.incident is None or not (turn.incident.symptom or "").strip():
             problems.append("incident model missing or no symptom")
+        elif turn.incident.root_cause:  # every case is an opening message: no evidence gathered yet
+            problems.append(f"root cause before evidence: {turn.incident.root_cause[:80]}")
+        if turn.incident and (filler := [f for f in SCALAR_FIELDS if PLACEHOLDER.match(getattr(turn.incident, f) or "")]):
+            problems.append(f"placeholder text instead of null: {filler}")
         if hit := _matches(case.get("must_not", []), text):
             problems.append(f"fix before evidence: {hit}")
         if not (turn.next_question or "").strip():

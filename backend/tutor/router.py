@@ -4,7 +4,8 @@ and put a `TutorService` on `app.state.tutor`.
 POST /session              start a session
 GET  /session/{id}         session + transcript (what the learner saw)
 POST /turn                 one tutor turn as Server-Sent Events:
-                           token, tool_call, tool_result_summary, rewrite, turn, lab, error
+                           token, tool_call, tool_result_summary, rewrite, turn, lab, error, incident,
+                           mode (first message is a customer problem: the session starts in incident mode)
                            (`lab`: the app ran the turn's lab_action, e.g. installed lab 01)
 GET  /ledger               mastery ledger, weakest first
 GET  /labs                 available labs
@@ -13,6 +14,7 @@ POST /lab/sql              the learner's own SQL in the same lab sandbox the tut
 POST /internal/refresh     start a docs refresh (pg_cron via pg_net); header X-Refresh-Token; 202 / 409
 GET  /internal/refresh     recent refresh runs (same token)
 GET  /voice                server TTS availability and voices per language
+PATCH /session/{id}/incident  the learner edits the incident model (set/clear a field, add/remove evidence)
 POST /voice/speech         signed URL to the cached server audio of one tutor turn's `speech` track
 """
 from __future__ import annotations
@@ -28,6 +30,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sse_starlette import EventSourceResponse
 
+from backend.tutor.incident import (
+    IncidentState,
+    ScalarField,
+    learner_edit,
+    looks_like_customer_problem,
+    merge,
+)
 from backend.tutor.orchestrator import Final, Rewrite, Token, ToolCall, ToolResultSummary
 from backend.tutor.service import TutorService
 from backend.tutor.tools import LabControlInput, LabRole, RunLabSqlInput, ToolContext
@@ -64,6 +73,13 @@ class TurnRequest(BaseModel):
     session_id: UUID
     text: str = Field(min_length=1, max_length=20000)
     input_mode: Literal["text", "voice"] = "text"  # voice: final Web Speech transcript (T2.1)
+
+
+class IncidentEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    field: ScalarField | Literal["evidence"]
+    value: str | None = Field(default=None, max_length=4000)  # evidence: adds an item
+    index: int | None = Field(default=None, ge=0)  # evidence without value: removes this item
 
 
 class SpeechRequest(BaseModel):
@@ -103,6 +119,14 @@ async def create_session(body: NewSession, svc: Svc, user: User) -> dict[str, An
 async def get_session(session_id: UUID, svc: Svc, user: User) -> dict[str, Any]:
     session = await _session_or_404(svc, user, session_id)
     return {**session, "transcript": await svc.store.transcript(user, session_id)}
+
+
+@router.patch("/session/{session_id}/incident")
+async def edit_incident(session_id: UUID, body: IncidentEdit, svc: Svc, user: User) -> dict[str, Any]:
+    session = await _session_or_404(svc, user, session_id)
+    state = learner_edit(IncidentState.model_validate(session["incident"] or {}), body.field, body.value, body.index)
+    await svc.store.save_incident(user, session_id, state)
+    return {"incident": state.model_dump(mode="json")}
 
 
 @router.get("/ledger")
@@ -172,6 +196,11 @@ async def turn(body: TurnRequest, svc: Svc, user: User) -> EventSourceResponse:
     async def events() -> AsyncIterator[dict[str, str]]:
         async with lock:
             history = await svc.store.history(user, body.session_id)
+            if not history and session["mode"] != "incident" and looks_like_customer_problem(body.text):
+                # The learner opens with a real problem: incident mode from the first turn, no onboarding (T2.2a).
+                await svc.store.set_mode(user, body.session_id, "incident")
+                session["mode"] = "incident"
+                yield _sse("mode", {"mode": "incident", "reason": "customer_problem"})
             state = await svc.session_state(user, session, history)
             runner = svc.runner(body.session_id)
             ctx = ToolContext(user_id=user, retriever=svc.retriever, ledger=svc.ledger, lab=runner)
@@ -195,6 +224,11 @@ async def turn(body: TurnRequest, svc: Svc, user: User) -> EventSourceResponse:
                         yield _sse("turn", {"turn_id": turn_id, "turn": event.turn.model_dump(mode="json"),
                                             "usage": event.usage, "model": event.model,
                                             "findings": [f.model_dump() for f in event.findings]})
+                        if event.turn.incident:  # merge the partial update into the session's incident model
+                            current = IncidentState.model_validate(session["incident"] or {})
+                            merged, changed = merge(current, event.turn.incident)
+                            await svc.store.save_incident(user, body.session_id, merged)
+                            yield _sse("incident", {"incident": merged.model_dump(mode="json"), "changed": changed})
                         installed = runner.active if runner.active and runner.active.lab_run_id != before else None
                         action = event.turn.lab_action
                         if action and not (installed and action.action == "install"

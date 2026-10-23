@@ -273,3 +273,65 @@ async def test_voice_speaks_only_the_learners_own_turns_speech(api: Any, users: 
     assert stored is not None and svc.voice.calls == [stored]
     assert (await client.post("/tutor/voice/speech", json={"turn_id": turn_id}, headers=auth(b))).status_code == 404
     assert (await client.post("/tutor/voice/speech", json={"text": "beliebig"}, headers=auth(a))).status_code == 422
+
+
+async def test_incident_model_is_merged_across_turns_and_editable(api: Any, users: tuple[UUID, UUID]) -> None:
+    client, _svc, fake = api
+    a, b = users
+    sid = (await client.post("/tutor/session", json={"mode": "incident"}, headers=auth(a))).json()["id"]
+    q1, q2 = "Seit wann genau ist es langsam?", "Was zeigt pg_stat_activity?"
+    base = {"mode": "incident", "language": "de", "persona_on": True}
+    fake.script += [
+        text_reply("Erst die Fakten.", turn=base | {"speech": q1, "next_question": q1, "incident": {
+            "symptom": "API langsam", "evidence": ["CPU 91%"]}}),
+        text_reply("Gut, weiter.", turn=base | {"speech": q2, "next_question": q2, "incident": {
+            "timeline": "seit gestern 14:00", "evidence": ["CPU 91%", "85/200 Verbindungen"],
+            "hypotheses": [{"h": "fehlender Index", "rank": 1, "test": "EXPLAIN ANALYZE"}]}}),
+    ]
+    first = parse_sse((await client.post("/tutor/turn", json={"session_id": sid, "text": "Supabase ist langsam"},
+                                         headers=auth(a))).text)
+    inc = dict(first)["incident"]
+    assert inc["changed"] == ["symptom", "evidence"] and inc["incident"]["model"]["symptom"] == "API langsam"
+
+    edited = await client.patch(f"/tutor/session/{sid}/incident", json={"field": "scope", "value": "nur Org A"},
+                                headers=auth(a))
+    assert edited.status_code == 200 and edited.json()["incident"]["sources"]["scope"] == "learner"
+
+    second = parse_sse((await client.post("/tutor/turn", json={"session_id": sid, "text": "Seit gestern"},
+                                          headers=auth(a))).text)
+    model = dict(second)["incident"]["incident"]["model"]
+    assert model["symptom"] == "API langsam" and model["scope"] == "nur Org A"
+    assert model["evidence"] == ["CPU 91%", "85/200 Verbindungen"]
+    state_msg = next(m["content"] for m in reversed(fake.requests[1]["messages"])  # the model saw the merged
+                     if m["role"] == "system")                                         # model and the learner edit
+    assert "- SYMPTOM: API langsam" in state_msg and "- SCOPE [learner]: nur Org A" in state_msg
+
+    view = (await client.get(f"/tutor/session/{sid}", headers=auth(a))).json()
+    assert view["incident"]["model"]["hypotheses"][0]["h"] == "fehlender Index"
+    assert (await client.patch(f"/tutor/session/{sid}/incident", json={"field": "scope", "value": "x"},
+                               headers=auth(b))).status_code == 404
+    assert (await client.patch(f"/tutor/session/{sid}/incident", json={"field": "nope", "value": "x"},
+                               headers=auth(a))).status_code == 422
+
+
+async def test_first_message_with_a_customer_problem_skips_onboarding(api: Any, users: tuple[UUID, UUID]) -> None:
+    client, svc, fake = api
+    a, _ = users
+    sid = (await client.post("/tutor/session", json={}, headers=auth(a))).json()["id"]
+    q = "Welche Meldung genau?"
+    fake.script += [
+        text_reply("Erst die Fakten.", turn={"mode": "incident", "language": "de", "persona_on": True, "speech": q,
+                                             "next_question": q, "incident": {"symptom": "Inserts schlagen fehl"}}),
+        text_reply("Gut.", turn={"mode": "lesson", "language": "de", "persona_on": True, "speech": q,
+                                 "next_question": q}),
+    ]
+    res = parse_sse((await client.post("/tutor/turn", headers=auth(a), json={
+        "session_id": sid, "text": "Kunde meldet: Seit dem Deploy schlagen Inserts mit 42501 fehl."})).text)
+    assert res[0] == ("mode", {"mode": "incident", "reason": "customer_problem"})
+    system = [m["content"] for m in fake.requests[0]["messages"] if m["role"] == "system"][-1]
+    assert "MODE: incident" in system and "Onboarding step" not in system and "FIRST TURN" not in system
+    assert (await svc.store.session(a, UUID(sid)))["mode"] == "incident"
+
+    # The model may leave incident mode later; onboarding still does not come back in this session.
+    await client.post("/tutor/turn", json={"session_id": sid, "text": "Ok"}, headers=auth(a))
+    assert await svc.store.onboarding_step(a, UUID(sid)) is None

@@ -4,86 +4,91 @@
   "mode": "incident",
   "language": "en",
   "persona_on": true,
-  "speech": "Kleinkünstler, stopped arriving is a symptom, not a cause. Docs say RLS is the most common silent culprit, but I won't guess. First fork: what status does your subscribe callback report right now? SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, or CLOSED?",
-  "text": "Kleinkünstler, \"stopped arriving\" is a symptom, not a cause. I'm building the incident model first and holding off on fixes.\n\n## Incident model (draft)\n\n| Field | Status |\n|---|---|\n| **Symptom** | Dashboard receives no Realtime updates since this morning. We don't yet know whether it gets nothing at all or only some events. |\n| **Expected** | Row changes (or broadcast messages) show up in the dashboard. |\n| **Scope** | Unknown: all users or some, all tables or one, all channels or one. |\n| **Timeline** | \"This morning\". What changed before that is unknown: deploy, migration, policy change, pause/restore, traffic spike. |\n| **Environment** | Unknown: hosted or local, plan, SDK version, Postgres Changes or Broadcast. |\n| **Evidence** | None yet. |\n\n## Hypotheses (ranked by priors, not by evidence)\n\nSupabase's own Postgres Changes troubleshooting guide says the usual causes are a short list. It also says to check RLS early, because RLS is \"the single biggest source of 'silently missing' events, by a wide margin\" [1]. Realtime sends Postgres Changes on RLS-protected tables only to clients whose policies allow them to read the row [2]. So the ranking below is a prior and will change once we have evidence.\n\n| # | Hypothesis | What would falsify it |\n|---|---|---|\n| 1 | RLS or grants changed, so the subscribing role can no longer read the rows. | The channel works for an unrestricted test table, or the policies didn't change. |\n| 2 | The table fell out of the `supabase_realtime` publication, or Realtime is disabled. The docs say to re-check this after a pause or restart, because the replication slot may need to reconnect [3]. | The table is listed in the publication and events from SQL inserts reach a test client. |\n| 3 | A connection quota was hit. The docs say the \"Concurrent Peak Connections\" quota can look a lot like a broken subscription [3]. | Subscribe status is `SUBSCRIBED` and quota usage is low. |\n| 4 | Client-side or auth problem: expired JWT, dropped socket, backgrounded tab, or a changed channel or filter. | A fresh client with a fresh session behaves the same way. |\n| 5 | Server-side Realtime or replication trouble. | Realtime logs are clean. |\n\nHypotheses 3 and 5 are visible in **Logs → Realtime**, which is the dashboard's step 8 [4]. We'll go there if the first tests don't settle it.\n\nOne design point for later: Realtime doesn't guarantee delivery of every message, so a dropped event should trigger a re-fetch rather than act as the only source of truth [4]. That's prevention, not a diagnosis.\n\n## The most discriminating missing fact\n\nWhether the channel connects is the first fork:\n\n- If it reaches `SUBSCRIBED` but stays silent, the connection is fine and something is filtering events. That points to RLS, the publication, or the filter (hypotheses 1 and 2).\n- If it ends in `CHANNEL_ERROR`, `TIMED_OUT` or `CLOSED`, the problem is before any row is evaluated. That points to quota, auth or the network (hypotheses 3 and 4).\n\nAsk the browser, don't guess. The subscribe callback receives that status.\n\n**What status does the dashboard's `.subscribe((status, err) => ...)` callback report right now: `SUBSCRIBED`, `CHANNEL_ERROR`, `TIMED_OUT`, `CLOSED`, or nothing at all? Paste the value and the `err` text, redacted if needed.**",
+  "speech": "Kleinkünstler, silent Realtime is a symptom, not a cause. The feature matters: Postgres Changes depends on a publication, RLS and a replication slot, Broadcast does not. One question first: what status does your channel's subscribe callback report right now?",
+  "text": "Kleinkünstler, \"stopped arriving\" is a symptom. I'm treating it as an incident, so no fix yet. First I'm building the model.\n\n## Incident model (draft)\n\n- **Symptom:** the dashboard stopped receiving Realtime updates this morning.\n- **Expected:** the dashboard receives an event whenever the relevant data changes.\n- **Timeline:** it worked before this morning. We don't yet know what changed before it stopped. A deploy, migration, policy change, traffic spike or token expiry would all fit.\n- **Still unknown:** scope, environment, which Realtime feature is in use, and any error or log evidence.\n\n## Why the feature matters\n\n\"Realtime\" covers different mechanisms with different failure points:\n\n- **`postgres_changes`:** Realtime reads a Postgres logical replication slot and delivers rows to subscribers [1]. RLS gates `INSERT` and `UPDATE` events, so only rows the subscribing role could `select` are sent. `DELETE` events are not RLS-filtered [2]. The table also has to be in the `supabase_realtime` publication. If it isn't in `public`, the subscribing role needs `select` granted on it too [2].\n- **Broadcast and Presence:** these don't depend on the replication slot. Private channels check RLS on `realtime.messages` [3].\n\n## Provisional hypotheses\n\nI'm ranking these by how well they fit \"worked before, stopped this morning\". The ranking changes as soon as we have evidence.\n\n| # | Hypothesis | Smallest discriminating test | Falsified if… |\n|---|---|---|---|\n| 1 | The subscription isn't joining or staying joined (expired JWT, quota, WebSocket drop). | Read the channel status callback and the browser's WebSocket frames. | The channel reports `SUBSCRIBED` and stays there. |\n| 2 | RLS or grants changed, so events are silently filtered. | Run the same `select` as the subscribing role, not as `postgres`. An empty result points at RLS [2]. | The select returns the changed rows. |\n| 3 | The table left the publication (for example, a migration recreated it). | Check Database → Publications, or query `pg_publication_tables`. | The table is listed in `supabase_realtime`. |\n| 4 | The server side is unhealthy (replication connection down, slot lag, poller gave up, project suspended for quota). | Look in the Realtime logs for codes like `ReplicationSlotLagTooHigh`, `ReplicationPollerMaxRetriesReached`, `RealtimeDisabledForTenant` [4]. | The logs show no such codes. |\n| 5 | The client filter no longer matches the row (schema, table, event or `.eq()` mismatch). | Subscribe with no filter and `event: '*'`. If that never fires, the problem is the publication or RLS, not the filter [2]. | The bare subscription receives events. |\n\nWhat is not yet evidence: none of these has been tested. Nothing is ruled out. I'm not claiming any of them is more likely than the others beyond the \"something changed\" reasoning above.\n\nA note on `DELETE`: if only `DELETE` events still arrive and `INSERT`/`UPDATE` don't, that points at hypothesis 2. That is an inference from how the docs describe RLS filtering, and we haven't tested it here.\n\n```mermaid\nflowchart TD\n  A[Dashboard silent] --> B{Channel status?}\n  B -->|CHANNEL_ERROR / TIMED_OUT / CLOSED| C[Connection, JWT, quota or server side: H1, H4]\n  B -->|SUBSCRIBED, no events| D{Bare subscription, no filter, event star}\n  D -->|Still silent| E[Publication, RLS, grants: H2, H3]\n  D -->|Events arrive| F[Filter mismatch: H5]\n```\n\nBefore I rank further, I need one piece of evidence. When your dashboard subscribes, what status does the channel's `subscribe` callback report right now: `SUBSCRIBED`, `CHANNEL_ERROR`, `TIMED_OUT`, `CLOSED`, or does the callback never fire? Please paste the exact string and any error message, with project identifiers redacted.\n\n**Sources**\n\n- [1] https://supabase.com/docs/guides/realtime/architecture.md#streaming-the-write-ahead-log (tier 1, fetched 2026-10-21)\n- [2] https://supabase.com/docs/guides/troubleshooting/realtime-messages-not-arriving.md#postgres-changes (tier 1, fetched 2026-10-23)\n- [3] https://supabase.com/docs/guides/realtime/authorization.md#how-it-works (tier 1, fetched 2026-10-23)\n- [4] https://supabase.com/docs/guides/realtime/error_codes.md#operational-error-codes (tier 1, fetched 2026-10-23)",
   "diagrams": [
    {
     "id": "d1",
     "kind": "flowchart",
-    "title": "First fork: does the channel reach SUBSCRIBED?",
-    "code": "flowchart TD\n  A[Dashboard silent] --> B{Subscribe status?}\n  B -->|SUBSCRIBED but no events| C[Events filtered or never produced]\n  B -->|CHANNEL_ERROR / TIMED_OUT / CLOSED| D[Failure before row evaluation]\n  C --> C1[RLS or grants changed]\n  C --> C2[Table not in supabase_realtime publication]\n  C --> C3[Filter or channel config changed]\n  D --> D1[Concurrent connections quota]\n  D --> D2[Expired or invalid JWT]\n  D --> D3[Network or socket drop]\n  D --> D4[Realtime logs show server-side errors]"
+    "title": "First split of the hypothesis tree",
+    "code": "flowchart TD\n  A[Dashboard silent] --> B{Channel status?}\n  B -->|CHANNEL_ERROR / TIMED_OUT / CLOSED| C[Connection, JWT, quota or server side]\n  B -->|SUBSCRIBED, no events| D{Bare subscription, no filter, event star}\n  D -->|Still silent| E[Publication, RLS, grants]\n  D -->|Events arrive| F[Filter mismatch]"
    }
   ],
   "citations": [
    {
     "n": 1,
-    "url": "https://supabase.com/docs/guides/troubleshooting/realtime-postgres-changes-troubleshooting.md#realtime-postgres-changes-troubleshooting",
-    "title": "Realtime: Postgres Changes Troubleshooting",
+    "url": "https://supabase.com/docs/guides/realtime/architecture.md#streaming-the-write-ahead-log",
+    "title": "Realtime Architecture: Streaming the Write-Ahead Log",
     "tier": 1,
-    "fetched_at": "2026-10-21T18:57:28.365434Z"
+    "fetched_at": "2026-10-21T18:56:42.991058Z"
    },
    {
     "n": 2,
-    "url": "https://supabase.com/docs/guides/realtime/authorization.md#interaction-with-postgres-changes",
-    "title": "Realtime Authorization: Interaction with Postgres Changes",
+    "url": "https://supabase.com/docs/guides/troubleshooting/realtime-messages-not-arriving.md#postgres-changes",
+    "title": "Realtime: Messages Not Arriving Troubleshooting (postgres_changes)",
     "tier": 1,
-    "fetched_at": "2026-10-21T18:55:27.116154Z"
+    "fetched_at": "2026-10-23T08:10:09.412548Z"
    },
    {
     "n": 3,
-    "url": "https://supabase.com/docs/guides/troubleshooting/realtime-postgres-changes-troubleshooting.md#step-7-is-realtime-enabled",
-    "title": "Step 7: Is Realtime enabled?",
+    "url": "https://supabase.com/docs/guides/realtime/authorization.md#how-it-works",
+    "title": "Realtime Authorization: How it works",
     "tier": 1,
-    "fetched_at": "2026-10-21T18:57:28.365434Z"
+    "fetched_at": "2026-10-23T08:09:18.389405Z"
    },
    {
     "n": 4,
-    "url": "https://supabase.com/docs/guides/troubleshooting/realtime-postgres-changes-troubleshooting.md#step-8-read-the-realtime-logs",
-    "title": "Step 8: Read the Realtime logs",
+    "url": "https://supabase.com/docs/guides/realtime/error_codes.md#operational-error-codes",
+    "title": "Realtime Operational Error Codes",
     "tier": 1,
-    "fetched_at": "2026-10-21T18:57:28.365434Z"
+    "fetched_at": "2026-10-23T08:09:35.665485Z"
    }
   ],
-  "next_question": "What status does the dashboard's .subscribe callback report right now (SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, CLOSED, or nothing), and what is the err text, if any?",
+  "next_question": "What status does the channel's subscribe callback report right now: SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, CLOSED, or does it never fire (paste the exact string and any error, redacted)?",
   "path": {
    "state": "main",
    "depth": 0,
-   "return_point": "incident triage: subscribe status fork"
+   "return_point": "incident: Realtime silent, first split of hypothesis tree"
   },
   "ledger_delta": [],
   "lab_action": null,
   "incident": {
-   "symptom": "Dashboard no longer receives Realtime updates since this morning; unclear whether zero events or partial.",
-   "expected": "Row changes or broadcast messages are delivered to the dashboard client.",
-   "scope": "Unknown: users, tables, channels, projects.",
-   "timeline": "Started this morning; preceding change unknown.",
-   "environment": "Unknown: hosted vs local, plan, SDK version, Postgres Changes vs Broadcast.",
+   "symptom": "Dashboard stopped receiving Realtime updates this morning.",
+   "expected": "Dashboard receives an event whenever the relevant data changes.",
+   "scope": null,
+   "timeline": "Worked previously; stopped this morning; cause of change not yet known.",
+   "environment": null,
    "evidence": [],
    "hypotheses": [
     {
-     "h": "RLS or grants changed so the subscribing role cannot read rows",
+     "h": "Subscription not joining or not staying joined (expired JWT, quota, WebSocket drop)",
      "rank": 1,
-     "test": "Check subscribe status; compare policies and grants; test with a role that can read the rows"
+     "test": "Read channel status callback and WebSocket frames in browser DevTools",
+     "status": "open"
     },
     {
-     "h": "Table removed from supabase_realtime publication or Realtime disabled (possibly after pause or restart)",
+     "h": "RLS or grants changed, so postgres_changes events are silently filtered",
      "rank": 2,
-     "test": "Check Database > Publications and Project Settings > Realtime; insert a row from SQL and watch a test client"
+     "test": "Run the same select as the subscribing role (not postgres); empty result implicates RLS",
+     "status": "open"
     },
     {
-     "h": "Concurrent Peak Connections quota or other connection limit reached",
+     "h": "Table dropped out of the supabase_realtime publication",
      "rank": 3,
-     "test": "Check subscribe status and quota usage; read Logs > Realtime"
+     "test": "Check Database > Publications or pg_publication_tables",
+     "status": "open"
     },
     {
-     "h": "Client-side or auth issue: expired JWT, dropped socket, backgrounded tab, changed filter",
+     "h": "Server side unhealthy (replication connection down, slot lag, poller stopped, project suspended for quota)",
      "rank": 4,
-     "test": "Fresh client with a fresh session; inspect WebSocket in DevTools"
+     "test": "Search Realtime logs for ReplicationSlotLagTooHigh, ReplicationPollerMaxRetriesReached, RealtimeDisabledForTenant",
+     "status": "open"
     },
     {
-     "h": "Server-side Realtime or replication problem",
+     "h": "Client filter no longer matches the changed row",
      "rank": 5,
-     "test": "Logs > Realtime for connection drops, replication errors, rate limiting"
+     "test": "Subscribe with no filter and event '*'",
+     "status": "open"
     }
    ],
    "root_cause": null,
@@ -93,13 +98,9 @@
    "confidence": null
   },
   "session_end": null,
-  "guard_flags": [
-   "CITATION_UNUSED"
-  ]
+  "guard_flags": []
  },
- "findings": [
-  "CITATION_UNUSED"
- ],
+ "findings": [],
  "tools": [
   {
    "name": "search_docs",
@@ -115,7 +116,7 @@
   {
    "name": "search_docs",
    "input": {
-    "query": "Realtime postgres changes RLS authorization publication supabase_realtime replica identity",
+    "query": "Realtime Postgres Changes publication supabase_realtime RLS authorization replication slot",
     "products": [
      "realtime",
      "database"
@@ -126,9 +127,9 @@
  ],
  "usage": {
   "input_tokens": 4,
-  "output_tokens": 3603,
-  "cache_creation_input_tokens": 53401,
-  "cache_read_input_tokens": 37555
+  "output_tokens": 4232,
+  "cache_creation_input_tokens": 43724,
+  "cache_read_input_tokens": 38324
  },
  "model": "claude-sonnet-5-5",
  "judge": null

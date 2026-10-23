@@ -35,7 +35,7 @@ export interface TutorTurn {
   path?: PathState | null;
   ledger_delta: { topic: string; score: number; evidence: string }[];
   lab_action?: { slug: string; action: string } | null;
-  incident?: Record<string, unknown> | null;
+  incident?: Incident | null;
   session_end?: {
     understand: string[];
     proved: string[];
@@ -46,6 +46,26 @@ export interface TutorTurn {
   guard_flags: string[];
 }
 
+export interface Hypothesis {
+  h: string;
+  rank: number;
+  test?: string | null;
+  status: "open" | "supported" | "falsified";
+}
+
+export const INCIDENT_SCALARS = ["symptom", "expected", "scope", "timeline", "environment", "root_cause",
+  "mitigation", "permanent_fix", "prevention", "confidence"] as const;
+export type IncidentScalar = (typeof INCIDENT_SCALARS)[number];
+
+export type Incident = { [K in IncidentScalar]?: string | null } & { evidence: string[]; hypotheses: Hypothesis[] };
+
+/** Mirrors backend/tutor/incident.py IncidentState: the session's merged incident model. */
+export interface IncidentState {
+  model: Incident;
+  sources: Record<string, "tutor" | "learner">;
+  conflicts: { field: string; learner: string; tutor: string }[];
+}
+
 export interface Session {
   id: string;
   objective: string | null;
@@ -53,6 +73,7 @@ export interface Session {
   language: Language;
   persona_on: boolean;
   started_at: string;
+  incident?: IncidentState | null;
 }
 
 export interface TranscriptRow {
@@ -126,5 +147,7 @@ export type StreamEvent =
   | { event: "tool_result_summary"; data: { name: string; is_error: boolean; summary: string } }
   | { event: "rewrite"; data: { codes: string[] } }
   | { event: "turn"; data: { turn_id: string; turn: TutorTurn; usage: Record<string, number>; model: string } }
+  | { event: "mode"; data: { mode: Mode; reason: string } }
+  | { event: "incident"; data: { incident: IncidentState; changed: string[] } }
   | { event: "lab"; data: { slug: string; action: string; result: Record<string, unknown> } }
   | { event: "error"; data: { status: number; message: string } };

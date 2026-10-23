@@ -21,6 +21,7 @@ from typing import Any, Literal
 
 import yaml
 
+from backend.tutor.incident import IncidentState, prompt_block
 from backend.tutor.ledger import LedgerEntry
 
 PROMPTS = Path(__file__).resolve().parents[2] / "prompts"
@@ -34,7 +35,9 @@ ONBOARDING_LAB = "01-rls-vs-grant"
 # The first-session path from the master instructions' STARTING INSTRUCTION, one step per state.
 # The app derives the step (service.py: TurnStore.progress); these lines tell the model what completes it.
 ONBOARDING: dict[str, str] = {
-    "opening": "Onboarding step 1 of 3 (opening): follow the FIRST TURN section exactly.",
+    "opening": ("Onboarding step 1 of 3 (opening): follow the FIRST TURN section exactly. Exception: if the "
+                "learner's message reports a concrete problem in a real system (an error, a failure, slowness, a "
+                "customer report), skip onboarding: set mode to incident and work the incident."),
     "request_flow": (
         "Onboarding step 2 of 3 (request-flow lesson): build on the learner's answer to the opening question and "
         "trace one request: client -> Supabase API -> Auth (JWT) -> PostgREST switches to the role from the JWT -> "
@@ -84,6 +87,7 @@ class SessionState:
     still_wrong: Sequence[str] = ()
     first_turn: bool = False
     onboarding: OnboardingStep | None = None
+    incident: IncidentState | None = None
     today: date = field(default_factory=date.today)
 
 
@@ -176,6 +180,8 @@ def session_block(state: SessionState) -> str:
     if state.still_wrong:
         lines += ["", "Still wrong at the end of the last session:"]
         lines += [f"- {_clip(item)}" for item in state.still_wrong]
+    if state.incident or state.mode == "incident":
+        lines.append(prompt_block(state.incident or IncidentState()))
     return "\n".join(lines)
 
 

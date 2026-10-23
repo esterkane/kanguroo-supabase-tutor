@@ -5,11 +5,12 @@ import { LoginForm } from "./auth/LoginForm";
 import { ChatPanel, type InputMode } from "./chat/ChatPanel";
 import { chatReducer, initialChat } from "./chatReducer";
 import { t } from "./i18n";
+import { type IncidentEditFn, IncidentPanel } from "./incident/IncidentPanel";
 import { consolePreset, LabConsole } from "./lab/LabConsole";
 import { type LabOutput, LabsPanel } from "./sidebar/LabsPanel";
 import { Ledger } from "./sidebar/Ledger";
 import { LessonSidebar } from "./sidebar/LessonSidebar";
-import type { LedgerEntry, Session, TutorTurn } from "./types";
+import type { IncidentState, LedgerEntry, Session, TutorTurn } from "./types";
 import type { ServerTts } from "./voice/useSpeech";
 
 export interface TutorAppProps {
@@ -19,7 +20,7 @@ export interface TutorAppProps {
   apiBase: string;
 }
 
-type Tab = "lesson" | "lab" | "ledger";
+type Tab = "lesson" | "incident" | "lab" | "ledger";
 const lastSessionKey = (userId: string) => `kaenguru.session.${userId}`;
 
 function readLastSession(userId: string): string | null {
@@ -48,6 +49,8 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
   const [fatal, setFatal] = useState<string | null>(null);
   const [handover, setHandover] = useState<LabOutput | null>(null);
   const [serverTts, setServerTts] = useState<ServerTts | null>(null);
+  const [incident, setIncident] = useState<IncidentState | null>(null);
+  const [incidentChanged, setIncidentChanged] = useState<string[]>([]);
   const authRef = useRef<AuthSession | null>(null);
 
   useEffect(() => {
@@ -73,6 +76,7 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
     const created = await api.createSession({});
     writeLastSession(userId, created.id);
     setSession(created);
+    setIncident(null);
     dispatch({ type: "reset" });
   }, [api, userId]);
 
@@ -85,6 +89,7 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
     (resume
       ? api.getSession(resume).then((full) => {
           setSession(full);
+          setIncident(full.incident ?? null);
           dispatch({ type: "load", rows: full.transcript });
         })
       : Promise.reject(new ApiError(404, "no session"))
@@ -105,6 +110,17 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
           setHandover({ slug: event.data.slug, action: event.data.action, body: event.data.result });
           setTab("lab");
         }
+        if (event.event === "mode") {  // the first message was a customer problem: incident mode, no onboarding
+          setSession((prev) => (prev ? { ...prev, mode: event.data.mode } : prev));
+          if (event.data.mode === "incident") setTab("incident");
+        }
+        if (event.event === "incident") {
+          setIncident((prev) => {
+            if (!prev) setTab("incident");  // the first incident turn opens the form
+            return event.data.incident;
+          });
+          setIncidentChanged(event.data.changed);
+        }
       }, inputMode);
       api.ledger().then((r) => setLedger(r.entries)).catch(() => undefined);
     } catch (e) {
@@ -112,12 +128,23 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
     }
   }, [api, session, s.noKey]);
 
+  const editIncident: IncidentEditFn = useCallback(async (body) => {
+    if (!session) return;
+    try {
+      setIncident((await api.editIncident(session.id, body)).incident);
+      setIncidentChanged([]);
+    } catch (e) {
+      dispatch({ type: "fail", message: String(e) });
+    }
+  }, [api, session]);
+
   if (!authReady) return null;
   if (!auth) return <LoginForm supabase={supabase} s={s} />;
 
   const lastTurn: TutorTurn | null =
     [...chat.items].reverse().find((i) => i.kind === "tutor")?.turn ?? null;
   const busy = chat.streaming !== null;
+  const showIncident = incident !== null || session?.mode === "incident" || lastTurn?.mode === "incident";
 
   return (
     <div className="grid h-screen grid-cols-1 grid-rows-[auto_1fr] text-sm md:grid-cols-[1fr_380px]">
@@ -137,16 +164,20 @@ export function TutorApp({ supabase, apiBase }: TutorAppProps) {
           </main>
           <aside className="flex min-h-0 flex-col">
             <nav className="flex border-b border-zinc-800 text-xs" role="tablist">
-              {(["lesson", "lab", "ledger"] as Tab[]).map((key) => (
+              {(["lesson", ...(showIncident ? ["incident"] : []), "lab", "ledger"] as Tab[]).map((key) => (
                 <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
                         className={`flex-1 px-2 py-1.5 ${tab === key ? "border-b-2 border-sky-500 text-zinc-100" : "text-zinc-500"}`}>
-                  {key === "lesson" ? s.lesson : key === "lab" ? s.labs : s.ledger}
+                  {key === "lesson" ? s.lesson : key === "incident" ? s.incident : key === "lab" ? s.labs : s.ledger}
                 </button>
               ))}
             </nav>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
               {tab === "lesson" && (
                 <LessonSidebar session={session} lastTurn={lastTurn} s={s} onCommand={send} busy={busy} />
+              )}
+              {tab === "incident" && (
+                <IncidentPanel state={incident} lang={session.language} s={s} onEdit={editIncident}
+                               changed={incidentChanged} />
               )}
               {tab === "lab" && (
                 <>

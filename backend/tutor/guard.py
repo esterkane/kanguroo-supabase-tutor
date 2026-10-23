@@ -75,6 +75,7 @@ class GuardContext:
     sources: dict[str, int] = field(default_factory=dict)
     ran_lab_sql: bool = False
     learner_text: str = ""  # secrets the learner pasted must not be repeated back, not even in a warning
+    known_evidence: int = 0  # evidence items already in the session's incident model
 
 
 def _norm(url: str) -> str:
@@ -282,11 +283,30 @@ def check_sql(turn: TutorTurn) -> list[GuardFinding]:
     return findings
 
 
-def check_incident(turn: TutorTurn) -> list[GuardFinding]:
+RESTART = re.compile(r"(?i)\b(re-?start\w*|reboot\w*|neu\s?(?:ge)?start\w*)")
+
+
+def check_incident(turn: TutorTurn, ctx: GuardContext) -> list[GuardFinding]:
     if turn.mode == "incident" and turn.incident is None:
-        return [_f("INCIDENT_MODEL_MISSING", "block", "Incident mode: fill `incident` progressively (null for "
-                                                      "unknowns).")]
-    return []
+        return [_f("INCIDENT_MODEL_MISSING", "block", "Incident mode: send `incident` with the new or changed "
+                                                      "fields (null for unknowns).")]
+    inc = turn.incident
+    if inc is None:
+        return []
+    findings = []
+    if inc.root_cause and RESTART.search(inc.root_cause):
+        findings.append(_f("INCIDENT_RESTART_ROOT_CAUSE", "block", "A restart is never a root cause: it is a "
+                           "mitigation at best. Name what the restart cleared (connections, locks, memory) or keep "
+                           "root_cause null."))
+    if inc.root_cause and not inc.evidence and ctx.known_evidence == 0:
+        findings.append(_f("INCIDENT_ROOT_CAUSE_WITHOUT_EVIDENCE", "block", "root_cause needs evidence first: keep it "
+                           "null and ask for the most discriminating evidence."))
+    if inc.root_cause and not inc.confidence:
+        findings.append(_f("INCIDENT_CONFIDENCE_MISSING", "warn", "Give `confidence` with a root cause."))
+    ranks = [h.rank for h in inc.hypotheses]
+    if len(ranks) != len(set(ranks)):
+        findings.append(_f("INCIDENT_HYPOTHESIS_RANKS", "warn", "Hypothesis ranks must be unique (1 = most likely)."))
+    return findings
 
 
 def check_speech(turn: TutorTurn) -> list[GuardFinding]:
@@ -322,7 +342,7 @@ def check(turn: TutorTurn, ctx: GuardContext) -> list[GuardFinding]:
         *check_uncited_claims(turn),
         *check_secrets(turn, ctx),
         *check_sql(turn),
-        *check_incident(turn),
+        *check_incident(turn, ctx),
         *check_speech(turn),
         *check_execution_claims(turn, ctx),
         *check_shape(turn),

@@ -97,3 +97,55 @@ test("voice: a spoken answer is sent as input_mode voice and only the speech tra
     vi.unstubAllGlobals();
   }
 });
+
+test("incident: the first incident event opens the incident form with the merged model", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    if (url === "/tutor/session") return json({ id: "s1", objective: null, mode: "lesson", language: "de",
+                                                persona_on: true, started_at: "now" }, 201);
+    if (url === "/tutor/ledger") return json({ entries: [] });
+    if (url === "/tutor/voice") return json({ tts: "browser", voices: {} });
+    if (url === "/tutor/turn") return sse(
+      ["turn", { turn_id: "t1", model: "m", usage: {}, turn: {
+        mode: "incident", language: "de", persona_on: true, speech: "Seit wann?", diagrams: [], ledger_delta: [],
+        guard_flags: [], citations: [], next_question: "Seit wann?", text: "Erst die Fakten.\n\nSeit wann?",
+        incident: { symptom: "API langsam", evidence: [], hypotheses: [] } } }],
+      ["incident", { changed: ["symptom"], incident: {
+        model: { symptom: "API langsam", evidence: [], hypotheses: [] }, sources: { symptom: "tutor" }, conflicts: [] } }],
+    );
+    return json({ detail: "unexpected" }, 500);
+  }));
+  try {
+    localStorage.clear();
+    render(<TutorApp supabase={fakeSupabase(true)} apiBase="/tutor" />);
+    const box = await screen.findByRole("textbox", { name: /Antwort oder Frage/ });
+    fireEvent.change(box, { target: { value: "Supabase ist langsam" } });
+    fireEvent.click(screen.getByRole("button", { name: "Senden" }));
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Incident" }).getAttribute("aria-selected")).toBe("true"));
+    expect(screen.getByText("API langsam")).toBeTruthy();
+    expect(screen.getByText("1/12 erfasst")).toBeTruthy();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("incident: a customer problem as first message switches the session to incident mode at once", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    if (url === "/tutor/session") return json({ id: "s1", objective: null, mode: "lesson", language: "de",
+                                                persona_on: true, started_at: "now" }, 201);
+    if (url === "/tutor/ledger") return json({ entries: [] });
+    if (url === "/tutor/voice") return json({ tts: "browser", voices: {} });
+    if (url === "/tutor/turn") return sse(["mode", { mode: "incident", reason: "customer_problem" }]);
+    return json({ detail: "unexpected" }, 500);
+  }));
+  try {
+    localStorage.clear();
+    render(<TutorApp supabase={fakeSupabase(true)} apiBase="/tutor" />);
+    const box = await screen.findByRole("textbox", { name: /Antwort oder Frage/ });
+    fireEvent.change(box, { target: { value: "Kunde meldet 42501 beim Insert" } });
+    fireEvent.click(screen.getByRole("button", { name: "Senden" }));
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Incident" }).getAttribute("aria-selected")).toBe("true"));
+    expect(screen.getByText(/Noch kein Incident/)).toBeTruthy();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

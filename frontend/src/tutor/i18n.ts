@@ -1,5 +1,5 @@
 // Learner-facing strings (CLAUDE.md rule 7). German is the default persona language.
-import type { Language } from "./types";
+import type { IncidentScalar, Language } from "./types";
 
 const strings = {
   de: {
@@ -57,6 +57,26 @@ const strings = {
     error: "Fehler",
     noKey: "Kein Anthropic-Schlüssel im Backend",
     diagramFailed: "Diagramm konnte nicht gezeichnet werden",
+    incident: "Incident",
+    incidentEmpty: "Noch kein Incident. Beschreib ein Kundenproblem oder klick auf \"incident\".",
+    filled: "erfasst",
+    open: "offen",
+    next: "als Nächstes",
+    edit: "bearbeiten",
+    save: "speichern",
+    cancel: "abbrechen",
+    clear: "leeren",
+    remove: "entfernen",
+    addEvidence: "Evidenz hinzufügen",
+    byTutor: "Känguru",
+    byLearner: "du",
+    conflict: "Das Känguru schlägt etwas anderes vor",
+    copyMarkdown: "Als Markdown kopieren",
+    copied: "kopiert",
+    test: "Test",
+    hypStatus_open: "offen",
+    hypStatus_supported: "gestützt",
+    hypStatus_falsified: "widerlegt",
   },
   en: {
     title: "Känguru Tutor",
@@ -113,6 +133,26 @@ const strings = {
     error: "Error",
     noKey: "No Anthropic key in the backend",
     diagramFailed: "diagram failed to render",
+    incident: "Incident",
+    incidentEmpty: "No incident yet. Describe a customer problem or click \"incident\".",
+    filled: "filled",
+    open: "open",
+    next: "next",
+    edit: "edit",
+    save: "save",
+    cancel: "cancel",
+    clear: "clear",
+    remove: "remove",
+    addEvidence: "Add evidence",
+    byTutor: "kangaroo",
+    byLearner: "you",
+    conflict: "The kangaroo suggests something else",
+    copyMarkdown: "Copy as Markdown",
+    copied: "copied",
+    test: "Test",
+    hypStatus_open: "open",
+    hypStatus_supported: "supported",
+    hypStatus_falsified: "falsified",
   },
 } as const;
 
@@ -121,5 +161,19 @@ export const t = (lang: Language): Strings => strings[lang];
 
 // The literal commands the tutor understands (prompts/tutor_runtime.md "Mode switches").
 export const MODE_COMMANDS = [
-  "hint", "show me", "skip", "neutral", "rabbit hole", "recap", "exam", "slower", "faster", "ohne Känguru",
+  "incident", "hint", "show me", "skip", "neutral", "rabbit hole", "recap", "exam", "slower", "faster", "ohne Känguru",
 ] as const;
+
+// Incident model headings (prompts/kaenguru_master_instructions.md SUPPORT ENGINEERING MODE).
+export const INCIDENT_LABELS: Record<Language, Record<IncidentScalar | "evidence" | "hypotheses", string>> = {
+  de: {
+    symptom: "Symptom", expected: "Erwartetes Verhalten", scope: "Umfang", timeline: "Zeitlinie",
+    environment: "Umgebung", evidence: "Evidenz", hypotheses: "Hypothesen", root_cause: "Ursache",
+    mitigation: "Sofortmaßnahme", permanent_fix: "Dauerhafte Lösung", prevention: "Vorbeugung", confidence: "Sicherheit",
+  },
+  en: {
+    symptom: "Symptom", expected: "Expected behaviour", scope: "Scope", timeline: "Timeline",
+    environment: "Environment", evidence: "Evidence", hypotheses: "Hypotheses", root_cause: "Root cause",
+    mitigation: "Mitigation", permanent_fix: "Permanent fix", prevention: "Prevention", confidence: "Confidence",
+  },
+};

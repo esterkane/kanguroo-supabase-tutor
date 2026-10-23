@@ -19,6 +19,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from backend.tutor.auth import JwtVerifier
 from backend.tutor.db import as_user
+from backend.tutor.incident import IncidentState
 from backend.tutor.lab_runner import LabRunner, lab_pool
 from backend.tutor.ledger import LedgerStore, PgLedger
 from backend.tutor.orchestrator import Message, Orchestrator, reply_text
@@ -62,9 +63,18 @@ class TurnStore:
     async def session(self, user_id: UUID, session_id: UUID) -> dict[str, Any] | None:
         async with as_user(self.pool, user_id) as conn:
             cur = conn.cursor(row_factory=dict_row)
-            await cur.execute("select id, objective, mode, language, persona_on, started_at, ended_at "
+            await cur.execute("select id, objective, mode, language, persona_on, started_at, ended_at, incident "
                               "from tutor.session where id = %s", (session_id,))
             return await cur.fetchone()
+
+    async def set_mode(self, user_id: UUID, session_id: UUID, mode: str) -> None:
+        async with as_user(self.pool, user_id) as conn:
+            await conn.execute("update tutor.session set mode = %s where id = %s", (mode, session_id))
+
+    async def save_incident(self, user_id: UUID, session_id: UUID, state: IncidentState) -> None:
+        async with as_user(self.pool, user_id) as conn:
+            await conn.execute("update tutor.session set incident = %s::jsonb where id = %s",
+                               (state.model_dump_json(), session_id))
 
     async def history(self, user_id: UUID, session_id: UUID) -> list[Message]:
         async with as_user(self.pool, user_id) as conn:
@@ -83,15 +93,17 @@ class TurnStore:
             return await cur.fetchall()
 
     async def onboarding_step(self, user_id: UUID, session_id: UUID) -> OnboardingStep | None:
-        """Where the learner is on the first-session path; None once lab 01 was ever handed over to them."""
+        """Where the learner is on the first-session path; None once lab 01 was ever handed over to them, or once
+        this session worked an incident (the learner came with a real problem, T2.2a)."""
         async with as_user(self.pool, user_id) as conn:
             cur = await conn.execute(
                 "select exists (select 1 from tutor.lab_run where lab_slug = %s),"
                 "       count(*) filter (where tutor_turn is not null),"
-                "       bool_or(tutor_turn->'diagrams' @> '[{\"kind\": \"sequenceDiagram\"}]')"
+                "       bool_or(tutor_turn->'diagrams' @> '[{\"kind\": \"sequenceDiagram\"}]'),"
+                "       coalesce(bool_or(tutor_turn->>'mode' = 'incident'), false)"
                 " from tutor.turn where session_id = %s", (ONBOARDING_LAB, session_id))
-            handed_over, tutor_turns, has_flow_diagram = await cur.fetchone() or (False, 0, False)
-        if handed_over:
+            handed_over, tutor_turns, has_flow_diagram, had_incident = await cur.fetchone() or (False, 0, False, False)
+        if handed_over or had_incident:
             return None
         if not tutor_turns:
             return "opening"
@@ -202,11 +214,13 @@ class TutorService:
         ledger = await self.ledger.read(user_id)
         runner = self.runners.get(session["id"])
         lab = runner.active if runner else None
-        onboarding = await self.store.onboarding_step(user_id, session["id"])
+        incident_mode = session["mode"] == "incident"
+        onboarding = None if incident_mode else await self.store.onboarding_step(user_id, session["id"])
         return SessionState(
             mode=session["mode"], language=session["language"], persona_on=session["persona_on"],
             objective=session["objective"], ledger=ledger,
             active_lab=ActiveLab(lab.spec.slug, lab.spec.title, lab.hints_used) if lab else None,
-            first_turn=not history and not ledger,
+            first_turn=not history and not ledger and not incident_mode,
             onboarding=onboarding,
+            incident=IncidentState.model_validate(session["incident"]) if session.get("incident") else None,
         )

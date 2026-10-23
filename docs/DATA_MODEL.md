@@ -52,6 +52,7 @@ erDiagram
     bool persona_on
     text language "de|en"
     timestamptz started_at
+    jsonb incident "IncidentState, merged per turn (T2.2)"
   }
   turn {
     uuid id PK

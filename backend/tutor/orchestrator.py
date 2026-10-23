@@ -226,7 +226,8 @@ class Orchestrator:
                 continue
 
             gctx = guard.GuardContext(sources=guard.collect_sources(history + new), learner_text=user_text,
-                                      ran_lab_sql=guard.ran_tool(new, "run_lab_sql"))
+                                      ran_lab_sql=guard.ran_tool(new, "run_lab_sql"),
+                                      known_evidence=len(state.incident.model.evidence) if state.incident else 0)
             findings = guard.check(turn, gctx)
             blocking = [f for f in findings if f.severity == "block"]
             if blocking and not guard_retried:

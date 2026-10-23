@@ -22,7 +22,7 @@ Pydantic model lives in `backend/tutor/schemas.py`; this is the human-readable c
   "lab_action": { "slug": "01-rls-vs-grant", "action": "install | reset | check | hint" },
   "incident": {
     "symptom": "...", "expected": "...", "scope": "...", "timeline": "...", "environment": "...",
-    "evidence": ["..."], "hypotheses": [{"h": "...", "rank": 1, "test": "..."}],
+    "evidence": ["..."], "hypotheses": [{"h": "...", "rank": 1, "test": "...", "status": "open | supported | falsified"}],
     "root_cause": null, "mitigation": null, "permanent_fix": null, "prevention": null, "confidence": null
   },
   "session_end": {
@@ -36,6 +36,9 @@ Field rules
 - `text` is not part of the JSON: the app sets it to the streamed Markdown. `speech` required; `next_question` required unless `mode == incident`
   and the learner asked for the fix, or `session_end` is present.
 - `citations[].n` must be the set of `[n]` markers used in `text`.
-- `incident` only in incident mode; fill progressively, keep `null` for unknowns.
+- `incident` only in incident mode; send only new or changed fields, `null` keeps a field (the app merges
+  into the session's incident model: evidence items are appended, a non-empty `hypotheses` list replaces
+  the ranked list). Unknown is `null`, never "Unknown: …" text. Never overwrite a field the session
+  state marks `[learner]`.
 - `session_end` only once per session, on `done/fertig/recap` or after lab outcome.
 - Unknown fields are rejected (`extra = "forbid"`).

@@ -116,7 +116,19 @@ Paths are in the sibling clones under ~/projects. Order = suggested order.
   Browser voices on this Mac are poor (only compact Anna + Eloquence voices in German): install a Premium/Enhanced
   German voice in macOS Spoken Content, or use Piper (R11, done). Live STT not verified (the Claude Browser pane
   blocks the microphone); test in Chrome.
-- [ ] T2.2 Incident mode: structured incident model form that the model fills progressively [socratic-tutor-loop]
+- [x] T2.2 Incident mode: structured incident model form that the model fills progressively [socratic-tutor-loop]
+  Done: `backend/tutor/incident.py` (app-owned IncidentState in `session.incident`; the model sends only new or
+  changed fields, placeholders like "Unknown: …" stay null, learner values are never overwritten and a different
+  proposal is recorded as a conflict); session state shows the model + missing fields; SSE `incident` event;
+  PATCH /session/{id}/incident; guard blocks restart-as-root-cause and root cause without evidence; Incident tab
+  (who filled what, next field, hypotheses with test + status, copy as Markdown). Incident evals 6/6 re-recorded.
+- [x] T2.2a New sessions run the T1.10 onboarding even when the learner opens with a customer problem; the report
+  became the "baseline case" in lesson mode and incident mode needed the `incident` command.
+  Done: `incident.looks_like_customer_problem` (strong signals such as SQLSTATE/HTTP codes, "permission denied",
+  "Kunde meldet"; or two weak ones; concept questions excluded) on a session's first message switches the session
+  to incident mode before the model runs (SSE `mode`); onboarding is skipped in incident mode and for the rest of a
+  session that had an incident turn; the opening onboarding step tells the model to switch itself when the
+  detector misses. Live: the same 42501 report now opens the Incident tab instead of the baseline case.
 - [ ] T2.3 Labs 02–08: missing grant, wrong JWT identity, slow RLS policy + missing index, lock contention, long transaction vs autovacuum, connection exhaustion (pool sim), migration drift [broken-labs]
   - Lab 04 (missing-index) should reproduce `docs/examples/slow-query-tutoring-path.md`: orders table,
     `customer_id` filter + `created_at desc limit 20`, then the index-used-but-slow follow-up (dead tuples).

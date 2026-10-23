@@ -1,6 +1,8 @@
 // Typed client for the FastAPI router (backend/tutor/router.py), mounted at apiBase.
 import { SseParser } from "./sse";
-import type { LabInfo, LabSqlResult, LedgerEntry, Session, StreamEvent, TranscriptRow, VoiceInfo } from "./types";
+import type {
+  IncidentScalar, IncidentState, LabInfo, LabSqlResult, LedgerEntry, Session, StreamEvent, TranscriptRow, VoiceInfo,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -29,6 +31,11 @@ export class TutorApi {
   }
   getSession(id: string) {
     return this.request<Session & { transcript: TranscriptRow[] }>(`/session/${id}`);
+  }
+  /** The learner edits the incident model: set/clear a field, add evidence (value) or remove evidence (index). */
+  editIncident(sessionId: string, body: { field: IncidentScalar | "evidence"; value?: string | null; index?: number }) {
+    return this.request<{ incident: IncidentState }>(`/session/${sessionId}/incident`,
+      { method: "PATCH", body: JSON.stringify(body) });
   }
   ledger() {
     return this.request<{ entries: LedgerEntry[] }>("/ledger");

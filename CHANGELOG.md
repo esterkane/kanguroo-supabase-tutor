@@ -98,3 +98,9 @@
 - 2026-10-23 R11 server TTS: German Piper voice (Thorsten high) as a separate GPL process (`make tts`), MP3 cached
   in the private Storage bucket `tutor-audio` and played via 1 h signed URL; `POST /tutor/voice/speech {turn_id}`
   voices only stored `speech`; picker defaults to it, Web Speech fallback on any failure; pgTAP 006, tests.
+- 2026-10-23 T2.2 incident mode: app-owned incident model per session (`session.incident`), merged from partial
+  TutorTurn updates; learner edits win (conflicts recorded); placeholders stay null; model sees known + missing
+  fields each turn; SSE `incident` + PATCH /session/{id}/incident; guard: no restart root cause, no root cause
+  without evidence; Incident tab with source badges, next field, hypothesis status, copy as Markdown.
+- 2026-10-23 T2.2a: a session whose first message reports a customer problem starts in incident mode (detector +
+  SSE `mode` event) and skips the first-session onboarding; onboarding also stays off after any incident turn.
